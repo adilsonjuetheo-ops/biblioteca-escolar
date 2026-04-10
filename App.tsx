@@ -6,6 +6,7 @@ import {
   ActivityIndicator, Image
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as ImagePicker from 'expo-image-picker';
 import MarleneChat from './MarleneChat';
 
 const API_URL = 'https://bibliotecaapi-production-7ee0.up.railway.app';
@@ -110,6 +111,7 @@ function getApiErrorMessage(err: unknown, fallback: string): string {
   }
   return fallback;
 }
+
 function calcularProgresso(emp: Emprestimo): number {
   if (!emp.dataReserva || !emp.dataDevolucao) return 50;
   const inicio = new Date(emp.dataReserva).getTime();
@@ -117,12 +119,10 @@ function calcularProgresso(emp: Emprestimo): number {
   const agora = Date.now();
   const total = fim - inicio;
   const decorrido = agora - inicio;
-  const [marleneAberta, setMarleneAberta] = useState(false);
-  const [comunicados, setComunicados] = useState<any[]>([]);
-  const [suspensoes, setSuspensoes] = useState<any[]>([]);
   if (total <= 0) return 100;
   return Math.min(100, Math.max(0, Math.round((decorrido / total) * 100)));
 }
+
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: CORES.parch },
   loginBox: { flexGrow: 1, justifyContent: 'center', padding: 28, gap: 10 },
@@ -266,6 +266,7 @@ const s = StyleSheet.create({
   scannerFeedbackTitle: { color: CORES.parch, fontSize: 14, fontWeight: '700', textAlign: 'center' },
   scannerFeedbackText: { color: CORES.parch, fontSize: 12, marginTop: 4, textAlign: 'center' },
 });
+
 export default function App() {
   const [tela, setTela] = useState<Tela>('login');
   const [abaAtiva, setAbaAtiva] = useState<AbaUsuario>('home');
@@ -343,6 +344,14 @@ export default function App() {
 
   const [agora, setAgora] = useState(Date.now());
 
+  // ── SCAN DE CAPA ──
+  const [scanandoCapa, setScanandoCapa] = useState(false);
+  const [livroScaneado, setLivroScaneado] = useState<{
+    titulo: string; autor?: string; genero?: string;
+    sinopse?: string; totalExemplares: number;
+  } | null>(null);
+  const [salvandoScan, setSalvandoScan] = useState(false);
+
   const saudacaoPorHorario = (() => {
     const hora = Number(
       new Intl.DateTimeFormat('pt-BR', {
@@ -380,19 +389,19 @@ export default function App() {
       const uid = usuarioAtual?.id;
       const safe = <T,>(p: Promise<{ data: T }>, fallback: T): Promise<{ data: T }> =>
         p.catch(() => ({ data: fallback }));
-     const [resLivros, resEmp, resAvaliacoes, resDesejos, resUsuarios, resComunicados, resSuspensoes] = await Promise.all([
-  axios.get(`${API_URL}/livros`),
-  axios.get(`${API_URL}/emprestimos`),
-  safe(axios.get(`${API_URL}/avaliacoes`), [] as Avaliacao[]),
-  uid
-    ? safe(axios.get(`${API_URL}/desejos?usuarioId=${uid}`), [] as Desejo[])
-    : Promise.resolve({ data: [] as Desejo[] }),
-  usuarioAtual?.perfil === 'bibliotecario'
-    ? safe(axios.get(`${API_URL}/usuarios`), [] as Usuario[])
-    : Promise.resolve({ data: [] as Usuario[] }),
-  safe(axios.get(`${API_URL}/comunicados`), []),
-  safe(axios.get(`${API_URL}/suspensoes`), []),
-]);
+      const [resLivros, resEmp, resAvaliacoes, resDesejos, resUsuarios, resComunicados, resSuspensoes] = await Promise.all([
+        axios.get(`${API_URL}/livros`),
+        axios.get(`${API_URL}/emprestimos`),
+        safe(axios.get(`${API_URL}/avaliacoes`), [] as Avaliacao[]),
+        uid
+          ? safe(axios.get(`${API_URL}/desejos?usuarioId=${uid}`), [] as Desejo[])
+          : Promise.resolve({ data: [] as Desejo[] }),
+        usuarioAtual?.perfil === 'bibliotecario'
+          ? safe(axios.get(`${API_URL}/usuarios`), [] as Usuario[])
+          : Promise.resolve({ data: [] as Usuario[] }),
+        safe(axios.get(`${API_URL}/comunicados`), []),
+        safe(axios.get(`${API_URL}/suspensoes`), []),
+      ]);
       setLivros(Array.isArray(resLivros.data) ? resLivros.data as Livro[] : []);
       const todosEmprestimos: Emprestimo[] = Array.isArray(resEmp.data) ? resEmp.data : [];
       const isBiblio = usuarioAtual?.perfil === 'bibliotecario';
@@ -409,7 +418,6 @@ export default function App() {
       setErroConexao(true);
     } finally {
       setCarregando(false);
-    
     }
   }
 
@@ -425,13 +433,13 @@ export default function App() {
       const iniciais = data.nome.split(' ').map((p: string) => p[0].toUpperCase()).join('').slice(0, 2);
       const usuarioLogado = { ...data, iniciais };
       setUsuario(usuarioLogado);
-     if (data.perfil === 'aluno') {
-     setTela('main'); setAbaAtiva('home');
-     } else if (data.perfil === 'professor') {
-     setTela('professor'); setAbaProfessor('home');
-     } else {
-     setTela('bibliotecario'); setAbaBiblio('dashboard');
-    }
+      if (data.perfil === 'aluno') {
+        setTela('main'); setAbaAtiva('home');
+      } else if (data.perfil === 'professor') {
+        setTela('professor'); setAbaProfessor('home');
+      } else {
+        setTela('bibliotecario'); setAbaBiblio('dashboard');
+      }
       await carregarDados(usuarioLogado);
     } catch (err: unknown) {
       setErro(getApiErrorMessage(err, 'E-mail ou senha incorretos'));
@@ -493,32 +501,27 @@ export default function App() {
       Alert.alert('Erro', getApiErrorMessage(err, 'Não foi possível cadastrar.'));
     }
   }
-  
-  async function handleReserva(livro: Livro) {
-    if (!usuario) return; // ADD
-    async function handleReserva(livro: Livro) {
-  if (!usuario) return;
-  
-  // Verificar se aluno está bloqueado
-  try {
-    const { data } = await axios.get(`${API_URL}/suspensoes/verificar/${usuario.id}`);
-    if (data.bloqueado) {
-      const expira = new Date(data.expiraEm).toLocaleDateString('pt-BR');
-      Alert.alert(
-        '🚫 Conta bloqueada',
-        `Você está bloqueado até ${expira}.\nMotivo: ${data.motivo || 'Devolução em atraso'}`,
-      );
-      return;
-    }
-  } catch {
-    // Se a verificação falhar, permite continuar
-  }
 
-  if (livro.disponiveis === 0) {
-    Alert.alert('Indisponível', 'Sem exemplares disponíveis.'); return;
-  }
-  try {
-    await axios.post(`${API_URL}/emprestimos`, { usuarioId: usuario.id, livroId: livro.id });
+  async function handleReserva(livro: Livro) {
+    if (!usuario) return;
+    try {
+      const { data } = await axios.get(`${API_URL}/suspensoes/verificar/${usuario.id}`);
+      if (data.bloqueado) {
+        const expira = new Date(data.expiraEm).toLocaleDateString('pt-BR');
+        Alert.alert(
+          '🚫 Conta bloqueada',
+          `Você está bloqueado até ${expira}.\nMotivo: ${data.motivo || 'Devolução em atraso'}`,
+        );
+        return;
+      }
+    } catch {
+      // Se a verificação falhar, permite continuar
+    }
+    if (livro.disponiveis === 0) {
+      Alert.alert('Indisponível', 'Sem exemplares disponíveis.'); return;
+    }
+    try {
+      await axios.post(`${API_URL}/emprestimos`, { usuarioId: usuario.id, livroId: livro.id });
       Alert.alert('Reserva confirmada!', `"${livro.titulo}" reservado!`);
       await carregarDados();
       setLivroSelecionado(null);
@@ -527,44 +530,43 @@ export default function App() {
     }
   }
 
-async function handleGerarQrRetirada(emp: Emprestimo) {
-  setGerandoQrRetirada(true);
-  try {
-    const { data } = await axios.post(`${API_URL}/emprestimos/${emp.id}/qr-retirada`, {
-      usuarioId: usuario?.id,
-    });
-    setEmprestimoQrAtual(emp);
-    setDadosQrRetirada(data);
-    setTelaQrRetirada(true);
-    await carregarDados();
-
-    // Polling — verifica a cada 3s se o status mudou para "retirado"
-      let timeout = setTimeout(() => clearInterval(intervalo), 300000);
-const intervalo = setInterval(async () => {
-  try {
-    const { data: empAtualizado } = await axios.get(`${API_URL}/emprestimos`);
-    const empEncontrado = empAtualizado.find((e: Emprestimo) => e.id === emp.id);
-    if (empEncontrado?.status === 'retirado') {
-      clearInterval(intervalo);
-      clearTimeout(timeout); // ADD
-      setTelaQrRetirada(false);
-      setEmprestimoQrAtual(null);
-      setDadosQrRetirada(null);
-      Alert.alert('✅ Retirada confirmada!', `"${emp.livroTitulo}" foi retirado com sucesso!`);
+  async function handleGerarQrRetirada(emp: Emprestimo) {
+    setGerandoQrRetirada(true);
+    try {
+      const { data } = await axios.post(`${API_URL}/emprestimos/${emp.id}/qr-retirada`, {
+        usuarioId: usuario?.id,
+      });
+      setEmprestimoQrAtual(emp);
+      setDadosQrRetirada(data);
+      setTelaQrRetirada(true);
       await carregarDados();
-    }
-  } catch {
-    clearInterval(intervalo);
-  }
-}, 3000);
 
-timeout = setTimeout(() => clearInterval(intervalo), 300000);
-  } catch (err: unknown) {
-    Alert.alert('Erro', getApiErrorMessage(err, 'Não foi possível gerar QR de retirada.'));
-  } finally {
-    setGerandoQrRetirada(false);
+      let timeout = setTimeout(() => clearInterval(intervalo), 300000);
+      const intervalo = setInterval(async () => {
+        try {
+          const { data: empAtualizado } = await axios.get(`${API_URL}/emprestimos`);
+          const empEncontrado = empAtualizado.find((e: Emprestimo) => e.id === emp.id);
+          if (empEncontrado?.status === 'retirado') {
+            clearInterval(intervalo);
+            clearTimeout(timeout);
+            setTelaQrRetirada(false);
+            setEmprestimoQrAtual(null);
+            setDadosQrRetirada(null);
+            Alert.alert('✅ Retirada confirmada!', `"${emp.livroTitulo}" foi retirado com sucesso!`);
+            await carregarDados();
+          }
+        } catch {
+          clearInterval(intervalo);
+        }
+      }, 3000);
+
+      timeout = setTimeout(() => clearInterval(intervalo), 300000);
+    } catch (err: unknown) {
+      Alert.alert('Erro', getApiErrorMessage(err, 'Não foi possível gerar QR de retirada.'));
+    } finally {
+      setGerandoQrRetirada(false);
+    }
   }
-}
 
   async function validarRetiradaPorQr(codigoEntrada: string, exibirAlertas = true) {
     const codigo = codigoEntrada.trim();
@@ -626,35 +628,23 @@ timeout = setTimeout(() => clearInterval(intervalo), 300000);
       setScanBloqueado(false);
     }
   }
-async function handleAplicarSuspensao(emp: Emprestimo, dias: number, motivo: string) {
-  try {
-    await axios.post(`${API_URL}/suspensoes`, {
-      usuarioId: emp.usuarioId,
-      emprestimoId: emp.id,
-      dias,
-      motivo,
-    });
-    Alert.alert('Bloqueio aplicado!', `Aluno bloqueado por ${dias} dia(s).`);
-    await carregarDados();
-  } catch (err: unknown) {
-    Alert.alert('Erro', getApiErrorMessage(err, 'Não foi possível aplicar o bloqueio.'));
+
+  async function handleAplicarSuspensao(emp: Emprestimo, dias: number, motivo: string) {
+    try {
+      await axios.post(`${API_URL}/suspensoes`, {
+        usuarioId: emp.usuarioId,
+        emprestimoId: emp.id,
+        dias,
+        motivo,
+      });
+      Alert.alert('Bloqueio aplicado!', `Aluno bloqueado por ${dias} dia(s).`);
+      await carregarDados();
+    } catch (err: unknown) {
+      Alert.alert('Erro', getApiErrorMessage(err, 'Não foi possível aplicar o bloqueio.'));
+    }
   }
-}
+
   async function handleDevolucao(emp: Emprestimo) {
-    async function handleAplicarSuspensao(emp: Emprestimo, dias: number, motivo: string) {
-  try {
-    await axios.post(`${API_URL}/suspensoes`, {
-      usuarioId: emp.usuarioId,
-      emprestimoId: emp.id,
-      dias,
-      motivo,
-    });
-    Alert.alert('Bloqueio aplicado!', `Aluno bloqueado por ${dias} dia(s).`);
-    await carregarDados();
-  } catch (err: unknown) {
-    Alert.alert('Erro', getApiErrorMessage(err, 'Não foi possível aplicar o bloqueio.'));
-  }
-}
     try {
       await axios.patch(`${API_URL}/emprestimos/${emp.id}/devolver`);
       Alert.alert('Devolução registrada!', 'Livro devolvido com sucesso.');
@@ -679,7 +669,6 @@ async function handleAplicarSuspensao(emp: Emprestimo, dias: number, motivo: str
       Alert.alert('Atenção', 'Informe pelo menos o título do livro.');
       return;
     }
-
     setSalvandoLivro(true);
     try {
       await axios.post(`${API_URL}/livros`, {
@@ -690,7 +679,6 @@ async function handleAplicarSuspensao(emp: Emprestimo, dias: number, motivo: str
         capa: livroCapaNovo.trim(),
         totalExemplares: Number(livroTotalNovo) || 1,
       });
-
       setLivroTituloNovo('');
       setLivroAutorNovo('');
       setLivroGeneroNovo('');
@@ -711,12 +699,10 @@ async function handleAplicarSuspensao(emp: Emprestimo, dias: number, motivo: str
     const disponiveisAtuais = Number(livro.disponiveis || 0);
     const emprestados = Math.max(0, totalAtual - disponiveisAtuais);
     const novoTotal = Math.max(0, totalAtual + delta);
-
     if (novoTotal < emprestados) {
       Alert.alert('Operação inválida', 'Não é possível reduzir abaixo da quantidade emprestada.');
       return;
     }
-
     const novoDisponivel = Math.max(0, novoTotal - emprestados);
     try {
       await axios.patch(`${API_URL}/livros/${livro.id}`, {
@@ -750,27 +736,28 @@ async function handleAplicarSuspensao(emp: Emprestimo, dias: number, motivo: str
       ]
     );
   }
+
   async function handleRenovar(emp: Emprestimo) {
-  Alert.alert(
-    'Renovar empréstimo',
-    `Deseja renovar "${emp.livroTitulo}"? O prazo será estendido por mais 5 dias.`,
-    [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Renovar',
-        onPress: async () => {
-          try {
-            await axios.patch(`${API_URL}/emprestimos/${emp.id}/renovar`);
-            Alert.alert('Renovado!', 'Prazo estendido por mais 5 dias.');
-            await carregarDados();
-          } catch (err: unknown) {
-            Alert.alert('Erro', getApiErrorMessage(err, 'Não foi possível renovar.'));
+    Alert.alert(
+      'Renovar empréstimo',
+      `Deseja renovar "${emp.livroTitulo}"? O prazo será estendido por mais 5 dias.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Renovar',
+          onPress: async () => {
+            try {
+              await axios.patch(`${API_URL}/emprestimos/${emp.id}/renovar`);
+              Alert.alert('Renovado!', 'Prazo estendido por mais 5 dias.');
+              await carregarDados();
+            } catch (err: unknown) {
+              Alert.alert('Erro', getApiErrorMessage(err, 'Não foi possível renovar.'));
+            }
           }
         }
-      }
-    ]
-  );
-}
+      ]
+    );
+  }
 
   async function handleEnviarResenha() {
     if (notaResenha === 0) {
@@ -800,26 +787,26 @@ async function handleAplicarSuspensao(emp: Emprestimo, dias: number, motivo: str
     }
   }
 
-    async function handleToggleDesejo(livro: { id: string }) {
-      const existente = desejos.find(d => d.livroId === livro.id);
-      setTogglendoDesejo(livro.id);
-      try {
-        if (existente) {
-          await axios.delete(`${API_URL}/desejos/${existente.id}`);
-          setDesejos(prev => prev.filter(d => d.id !== existente.id));
-        } else {
-          const { data } = await axios.post(`${API_URL}/desejos`, {
-            usuarioId: usuario.id,
-            livroId: livro.id,
-          });
-          setDesejos(prev => [...prev, data]);
-        }
-      } catch (err: unknown) {
-        Alert.alert('Erro', getApiErrorMessage(err, 'Não foi possível atualizar a lista de desejos.'));
-      } finally {
-        setTogglendoDesejo(null);
+  async function handleToggleDesejo(livro: { id: string }) {
+    const existente = desejos.find(d => d.livroId === livro.id);
+    setTogglendoDesejo(livro.id);
+    try {
+      if (existente) {
+        await axios.delete(`${API_URL}/desejos/${existente.id}`);
+        setDesejos(prev => prev.filter(d => d.id !== existente.id));
+      } else {
+        const { data } = await axios.post(`${API_URL}/desejos`, {
+          usuarioId: usuario.id,
+          livroId: livro.id,
+        });
+        setDesejos(prev => [...prev, data]);
       }
+    } catch (err: unknown) {
+      Alert.alert('Erro', getApiErrorMessage(err, 'Não foi possível atualizar a lista de desejos.'));
+    } finally {
+      setTogglendoDesejo(null);
     }
+  }
 
   function resetarFluxoRecuperacao() {
     setRecCodigo('');
@@ -840,15 +827,12 @@ async function handleAplicarSuspensao(emp: Emprestimo, dias: number, motivo: str
       setRecMensagem('Use seu e-mail escolar institucional.');
       return;
     }
-
     setRecLoading(true);
     setRecMensagem('');
     try {
       const { data } = await axios.post(`${API_URL}/usuarios/recuperar-senha`, { email: emailNormalizado });
       setRecEtapa('codigo');
       setRecMensagem(data?.mensagem || 'Código enviado. Confira seu e-mail institucional.');
-
-      // Suporte para ambiente de desenvolvimento quando a API retorna o código diretamente.
       if (data?.codigo) {
         Alert.alert('Código de recuperação (teste)', `Use o código: ${data.codigo}`);
       }
@@ -873,7 +857,6 @@ async function handleAplicarSuspensao(emp: Emprestimo, dias: number, motivo: str
       setRecMensagem('A confirmação da senha não confere.');
       return;
     }
-
     setRecLoading(true);
     setRecMensagem('');
     try {
@@ -898,6 +881,54 @@ async function handleAplicarSuspensao(emp: Emprestimo, dias: number, motivo: str
       setRecMensagem(getApiErrorMessage(err, 'Não foi possível redefinir a senha.'));
     } finally {
       setRecLoading(false);
+    }
+  }
+
+  // ── SCAN DE CAPA ──
+  async function handleScanCapa() {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permissão necessária', 'Ative a câmera para escanear capas.');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.7,
+      base64: true,
+    });
+
+    if (result.canceled || !result.assets?.[0]?.base64) return;
+
+    setScanandoCapa(true);
+    setLivroScaneado(null);
+
+    try {
+      const { data } = await axios.post(`${API_URL}/api/scan-livro/analisar`, {
+        imagemBase64: result.assets[0].base64,
+        mediaType: result.assets[0].mimeType || 'image/jpeg',
+      });
+      setLivroScaneado({ ...data, totalExemplares: data.totalExemplares || 1 });
+    } catch (err: any) {
+      const msg = err?.response?.data?.erro || 'Não foi possível identificar o livro.';
+      Alert.alert('Erro ao escanear', msg);
+    } finally {
+      setScanandoCapa(false);
+    }
+  }
+
+  async function handleSalvarLivroScaneado() {
+    if (!livroScaneado) return;
+    setSalvandoScan(true);
+    try {
+      await axios.post(`${API_URL}/api/scan-livro/cadastrar`, livroScaneado);
+      Alert.alert('✅ Livro cadastrado!', `"${livroScaneado.titulo}" foi adicionado ao acervo.`);
+      setLivroScaneado(null);
+      await carregarDados();
+    } catch (err: any) {
+      Alert.alert('Erro', err?.response?.data?.erro || 'Não foi possível cadastrar.');
+    } finally {
+      setSalvandoScan(false);
     }
   }
 
@@ -992,7 +1023,6 @@ async function handleAplicarSuspensao(emp: Emprestimo, dias: number, motivo: str
           <Text style={{ fontSize: 48, textAlign: 'center', marginBottom: 16 }}>🔒</Text>
           <Text style={s.loginTitle}>Recuperar senha</Text>
           <Text style={[s.loginEscola, { marginBottom: 20 }]}>Fluxo seguro em duas etapas</Text>
-
           {recEtapa === 'email' ? (
             <>
               <TextInput
@@ -1059,7 +1089,6 @@ async function handleAplicarSuspensao(emp: Emprestimo, dias: number, motivo: str
               </TouchableOpacity>
             </>
           )}
-
           {recMensagem ? (
             <Text style={[s.erroText, { color: CORES.ink, backgroundColor: 'rgba(74,124,89,0.14)' }]}>
               {recMensagem}
@@ -1162,194 +1191,729 @@ async function handleAplicarSuspensao(emp: Emprestimo, dias: number, motivo: str
     );
   }
 
-  // ── PAINEL BIBLIOTECÁRIO ──
+  // ── RENDERS COMPARTILHADOS (usados por aluno, professor e bibliotecário) ──
+
   const renderNotificacoes = () => (
-  <ScrollView style={{ flex: 1 }}>
-    <View style={s.homeHeader}>
-      <View>
-        <Text style={s.homeGreeting}>Avisos e comunicados</Text>
-        <Text style={s.homeName}>{comunicados.length} mensagens</Text>
-      </View>
-    </View>
-    <View style={{ padding: 16 }}>
-      {carregando ? (
-        <ActivityIndicator color={CORES.amber} size="large" style={{ marginTop: 40 }} />
-      ) : comunicados.length === 0 ? (
-        <View style={s.emptyBox}>
-          <Text style={{ fontSize: 40, textAlign: 'center', marginBottom: 12 }}>📢</Text>
-          <Text style={s.emptyText}>Nenhum comunicado no momento</Text>
+    <ScrollView style={{ flex: 1 }}>
+      <View style={s.homeHeader}>
+        <View>
+          <Text style={s.homeGreeting}>Avisos e comunicados</Text>
+          <Text style={s.homeName}>{comunicados.length} mensagens</Text>
         </View>
-      ) : comunicados.map((com: any) => (
-        <View key={com.id} style={s.comunicadoCard}>
-          <View style={s.comunicadoHeader}>
-            <View style={s.comunicadoIconWrap}>
-              <Text style={{ fontSize: 20 }}>
-                {com.destinatario === 'alunos' ? '🎒' :
-                 com.destinatario === 'professores' ? '📖' : '📢'}
-              </Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.comunicadoTitulo}>{com.titulo}</Text>
-              <Text style={s.comunicadoMeta}>
-                {com.criadoEm ? new Date(com.criadoEm).toLocaleDateString('pt-BR') : '—'}
-              </Text>
-            </View>
-            <View style={[s.badgeSmall, {
-              backgroundColor: com.destinatario === 'todos' ? 'rgba(74,124,89,0.12)' :
-                com.destinatario === 'alunos' ? 'rgba(201,123,46,0.12)' : 'rgba(74,100,144,0.12)'
-            }]}>
-              <Text style={[s.badgeText, {
-                color: com.destinatario === 'todos' ? CORES.sage :
-                  com.destinatario === 'alunos' ? CORES.amber : '#4a6490'
+      </View>
+      <View style={{ padding: 16 }}>
+        {carregando ? (
+          <ActivityIndicator color={CORES.amber} size="large" style={{ marginTop: 40 }} />
+        ) : comunicados.length === 0 ? (
+          <View style={s.emptyBox}>
+            <Text style={{ fontSize: 40, textAlign: 'center', marginBottom: 12 }}>📢</Text>
+            <Text style={s.emptyText}>Nenhum comunicado no momento</Text>
+          </View>
+        ) : comunicados.map((com: any) => (
+          <View key={com.id} style={s.comunicadoCard}>
+            <View style={s.comunicadoHeader}>
+              <View style={s.comunicadoIconWrap}>
+                <Text style={{ fontSize: 20 }}>
+                  {com.destinatario === 'alunos' ? '🎒' :
+                   com.destinatario === 'professores' ? '📖' : '📢'}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.comunicadoTitulo}>{com.titulo}</Text>
+                <Text style={s.comunicadoMeta}>
+                  {com.criadoEm ? new Date(com.criadoEm).toLocaleDateString('pt-BR') : '—'}
+                </Text>
+              </View>
+              <View style={[s.badgeSmall, {
+                backgroundColor: com.destinatario === 'todos' ? 'rgba(74,124,89,0.12)' :
+                  com.destinatario === 'alunos' ? 'rgba(201,123,46,0.12)' : 'rgba(74,100,144,0.12)'
               }]}>
-                {com.destinatario === 'todos' ? 'Todos' :
-                 com.destinatario === 'alunos' ? 'Alunos' : 'Professores'}
-              </Text>
+                <Text style={[s.badgeText, {
+                  color: com.destinatario === 'todos' ? CORES.sage :
+                    com.destinatario === 'alunos' ? CORES.amber : '#4a6490'
+                }]}>
+                  {com.destinatario === 'todos' ? 'Todos' :
+                   com.destinatario === 'alunos' ? 'Alunos' : 'Professores'}
+                </Text>
+              </View>
+            </View>
+            <Text style={s.comunicadoMensagem}>{com.mensagem}</Text>
+            <Text style={s.comunicadoAutor}>Enviado por: {com.autor}</Text>
+          </View>
+        ))}
+      </View>
+    </ScrollView>
+  );
+
+  // ── RENDERS DO ALUNO ──
+
+  function renderDetalhe() {
+    return (
+      <ScrollView style={{ flex: 1 }}>
+        <View style={s.homeHeader}>
+          <TouchableOpacity onPress={() => setLivroSelecionado(null)} style={{ marginRight: 12 }}>
+            <Text style={{ color: CORES.amberLt, fontSize: 16, fontWeight: '700' }}>← Voltar</Text>
+          </TouchableOpacity>
+          <Text style={[s.homeGreeting, { flex: 1 }]}>Detalhes do livro</Text>
+          {(() => {
+            const noDesejo = desejos.find(d => d.livroId === livroSelecionado?.id);
+            const carregandoDesejo = togglendoDesejo === livroSelecionado?.id;
+            return (
+              <TouchableOpacity
+                onPress={() => livroSelecionado && handleToggleDesejo(livroSelecionado)}
+                disabled={carregandoDesejo}
+                style={{ padding: 4 }}>
+                <Text style={{ fontSize: 24, opacity: carregandoDesejo ? 0.4 : 1 }}>
+                  {noDesejo ? '❤️' : '🤍'}
+                </Text>
+                <Text style={{ fontSize: 9, color: noDesejo ? CORES.amberLt : 'rgba(245,239,227,0.4)', textAlign: 'center' }}>
+                  {noDesejo ? 'Salvo' : 'Salvar'}
+                </Text>
+              </TouchableOpacity>
+            );
+          })()}
+        </View>
+        <View style={{ padding: 20 }}>
+          <View style={s.detalheCard}>
+            {livroSelecionado?.capa ? (
+              <Image source={{ uri: livroSelecionado.capa }} style={s.detalheCover} resizeMode="cover" />
+            ) : (
+              <View style={[s.detalheCover, { backgroundColor: CORES.ink }]} />
+            )}
+            <View style={{ flex: 1 }}>
+              <Text style={s.detalheTitulo}>{livroSelecionado?.titulo}</Text>
+              <Text style={s.detalheAutor}>{livroSelecionado?.autor}</Text>
+              {livroSelecionado?.genero ? (
+                <View style={[s.badgeSmall, { backgroundColor: 'rgba(201,123,46,0.12)', marginTop: 8 }]}>
+                  <Text style={[s.badgeText, { color: CORES.amber }]}>{livroSelecionado.genero}</Text>
+                </View>
+              ) : null}
             </View>
           </View>
-          <Text style={s.comunicadoMensagem}>{com.mensagem}</Text>
-          <Text style={s.comunicadoAutor}>Enviado por: {com.autor}</Text>
-        </View>
-      ))}
-    </View>
-  </ScrollView>
-);
- const renderMeusLivros = () => (
-  <ScrollView style={{ flex: 1 }}>
-    <View style={s.homeHeader}>
-      <View>
-        <Text style={s.homeGreeting}>Minhas Reservas</Text>
-        <Text style={s.homeName}>{emprestimosAtivos.length + historico.length} livros</Text>
-      </View>
-    </View>
-    <View style={{ padding: 16 }}>
-      <Text style={s.sectionLabel}>EMPRÉSTIMOS ATIVOS</Text>
-     {emprestimosAtivos.map(emp => (
-  <View key={emp.id} style={s.loanCard}>
-    <View style={[s.loanCover, { backgroundColor: CORES.sage }]} />
-    <View style={s.loanInfo}>
-      <Text style={s.loanTitle}>{emp.livroTitulo || `Livro #${emp.livroId}`}</Text>
-      <Text style={s.loanAuthor}>{emp.livroAutor || '—'}</Text>
-      <View style={[s.badgeSmall, { backgroundColor: 'rgba(201,123,46,0.12)', marginTop: 6 }]}>
-        <Text style={[s.badgeText, { color: CORES.amber }]}>
-          {emp.renovado ? '🔄 Renovado' : emp.status}
-        </Text>
-      </View>
-      {emp.dataReserva ? (
-        <Text style={[s.loanAuthor, { marginTop: 4 }]}>
-          Reservado em {new Date(emp.dataReserva).toLocaleDateString('pt-BR')}
-        </Text>
-      ) : null}
-    </View>
-    <View style={{ gap: 6 }}>
-      {emp.status === 'reservado' ? (
-        <TouchableOpacity
-          style={[s.btnAmber, { paddingHorizontal: 8, opacity: gerandoQrRetirada ? 0.7 : 1 }]}
-          onPress={() => handleGerarQrRetirada(emp)}
-          disabled={gerandoQrRetirada}>
-          <Text style={s.btnAmberText}>📱 QR retirada</Text>
-        </TouchableOpacity>
-      ) : null}
-      {emp.status === 'retirado' && !emp.renovado && (
-        <TouchableOpacity
-          style={[s.btnAmber, { paddingHorizontal: 8 }]}
-          onPress={() => handleRenovar(emp)}>
-          <Text style={s.btnAmberText}>🔄 Renovar</Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  </View>
-))}
 
-      <Text style={[s.sectionLabel, { marginTop: 16 }]}>HISTÓRICO</Text>
-      {historico.length === 0 ? (
-        <View style={s.emptyBox}>
-          <Text style={s.emptyText}>Nenhuma devolução registrada</Text>
-        </View>
-      ) : historico.map(h => {
-        const minhaAv = todasAvaliacoes.find(a => a.usuarioId === usuario?.id && a.livroId === h.livroId);
-        return (
-        <View key={h.id} style={s.loanCard}>
-          <View style={[s.loanCover, { backgroundColor: CORES.muted }]} />
-          <View style={s.loanInfo}>
-            <Text style={s.loanTitle}>{h.livroTitulo || `Livro #${h.livroId}`}</Text>
-            <Text style={s.loanAuthor}>{h.livroAutor || '—'}</Text>
-            {h.dataDevolucao ? (
-              <Text style={[s.loanAuthor, { marginTop: 4 }]}>
-                Devolvido em {new Date(h.dataDevolucao).toLocaleDateString('pt-BR')}
-              </Text>
-            ) : null}
-            {minhaAv ? (
-              <View style={{ flexDirection: 'row', gap: 2, marginTop: 6 }}>
-                {[1,2,3,4,5].map(i => (
-                  <Text key={i} style={{ fontSize: 13, color: i <= minhaAv.nota ? CORES.amber : CORES.border }}>★</Text>
+          <View style={s.detalheInfoRow}>
+            {[
+              { label: 'Exemplares', valor: livroSelecionado?.totalExemplares || 1 },
+              { label: 'Disponíveis', valor: livroSelecionado?.disponiveis || 0 },
+              { label: 'Prazo', valor: '14 dias' },
+            ].map((info, i) => (
+              <View key={i} style={s.detalheInfoChip}>
+                <Text style={s.detalheInfoLabel}>{info.label}</Text>
+                <Text style={[s.detalheInfoValor, {
+                  color: info.label === 'Disponíveis'
+                    ? (livroSelecionado?.disponiveis > 0 ? CORES.sage : CORES.rust)
+                    : CORES.ink
+                }]}>{info.valor}</Text>
+              </View>
+            ))}
+          </View>
+
+          {livroSelecionado?.sinopse ? (
+            <View style={{ marginTop: 20 }}>
+              <Text style={s.sectionLabel}>SINOPSE</Text>
+              <Text style={s.detalheSinopse}>{livroSelecionado.sinopse}</Text>
+            </View>
+          ) : null}
+
+          <View style={{ marginTop: 24, gap: 12 }}>
+            {livroSelecionado?.disponiveis > 0 ? (
+              <TouchableOpacity style={s.btnDetalheReserva} onPress={() => handleReserva(livroSelecionado)}>
+                <Text style={s.btnDetalheReservaText}>✓ Confirmar reserva</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={[s.btnDetalheReserva, { backgroundColor: CORES.muted }]}
+                onPress={async () => {
+                  if (!usuario) return;
+                  try {
+                    await axios.post(`${API_URL}/desejos`, {
+                      usuarioId: usuario.id,
+                      livroId: livroSelecionado?.id,
+                    });
+                    Alert.alert('Fila de espera', 'Você foi adicionado à lista de desejos! Será avisado quando disponível.');
+                    await carregarDados();
+                  } catch {
+                    Alert.alert('Aviso', 'Você já está na lista de desejos para este livro.');
+                  }
+                }}>
+                <Text style={s.btnDetalheReservaText}>🔔 Entrar na fila de espera</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={[s.btnSecundario, { marginTop: 8 }]}
+              onPress={() => setMarleneAberta(true)}>
+              <Text style={s.btnSecundarioText}>📚 Perguntar para a Marlene</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.btnDetalheVoltar} onPress={() => setLivroSelecionado(null)}>
+              <Text style={s.btnDetalheVoltarText}>Voltar ao acervo</Text>
+            </TouchableOpacity>
+          </View>
+
+          {(() => {
+            const avLivro = todasAvaliacoes.filter(a => a.livroId === livroSelecionado?.id);
+            if (avLivro.length === 0) return null;
+            const media = (avLivro.reduce((s, a) => s + a.nota, 0) / avLivro.length).toFixed(1);
+            return (
+              <View style={{ marginTop: 24 }}>
+                <Text style={s.sectionLabel}>AVALIAÇÕES DA COMUNIDADE</Text>
+                <View style={s.avaliacaoMediaRow}>
+                  <Text style={s.avaliacaoMediaNum}>{media}</Text>
+                  <View>
+                    <View style={{ flexDirection: 'row', gap: 3 }}>
+                      {[1,2,3,4,5].map(i => (
+                        <Text key={i} style={{ fontSize: 18, color: i <= Math.round(Number(media)) ? CORES.amber : CORES.border }}>★</Text>
+                      ))}
+                    </View>
+                    <Text style={[s.loanAuthor, { marginTop: 4 }]}>{avLivro.length} avaliação(ões)</Text>
+                  </View>
+                </View>
+                {avLivro.map(av => (
+                  <View key={av.id} style={s.avaliacaoCard}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={s.avaliacaoNome}>{av.usuarioNome}</Text>
+                      <View style={{ flexDirection: 'row', gap: 2 }}>
+                        {[1,2,3,4,5].map(i => (
+                          <Text key={i} style={{ fontSize: 13, color: i <= av.nota ? CORES.amber : CORES.border }}>★</Text>
+                        ))}
+                      </View>
+                    </View>
+                    {av.resenha ? <Text style={s.resenhaTexto}>"{av.resenha}"</Text> : null}
+                    <Text style={[s.loanAuthor, { marginTop: 6 }]}>
+                      {new Date(av.criadoEm).toLocaleDateString('pt-BR')}
+                    </Text>
+                  </View>
                 ))}
               </View>
-            ) : null}
+            );
+          })()}
+        </View>
+        {marleneAberta && livroSelecionado && (
+          <MarleneChat
+            livro={livroSelecionado}
+            acervo={livros}
+            onFechar={() => setMarleneAberta(false)}
+          />
+        )}
+      </ScrollView>
+    );
+  }
+
+  const renderHome = () => (
+    <ScrollView style={{ flex: 1 }}>
+      <View style={s.homeHeader}>
+        <View>
+          <Text style={s.homeGreeting}>{saudacaoPorHorario} 👋</Text>
+          <Text style={s.homeName}>{usuario?.nome}</Text>
+        </View>
+        <View style={s.homeAvatarSmall}>
+          <Text style={s.homeAvatarText}>{usuario?.iniciais}</Text>
+        </View>
+      </View>
+      <View style={{ padding: 16, gap: 12 }}>
+        <View style={s.searchBar}>
+          <Text style={{ fontSize: 14, marginRight: 6 }}>🔍</Text>
+          <Text style={s.searchPlaceholder}>Buscar livros, autores...</Text>
+        </View>
+        <TouchableOpacity style={s.btnSecundario} onPress={() => carregarDados()}>
+          <Text style={s.btnSecundarioText}>↻  Atualizar acervo</Text>
+        </TouchableOpacity>
+        {erroConexao && (
+          <View style={[s.emptyBox, { borderColor: CORES.rust, borderWidth: 1, marginBottom: 8 }]}>
+            <Text style={[s.emptyText, { color: CORES.rust }]}>⚠️  Sem conexão com o servidor.{`\n`}Verifique o Wi-Fi e toque em Atualizar acervo.</Text>
           </View>
-          {minhaAv ? (
-            <TouchableOpacity
-              style={[s.badgeSmall, { backgroundColor: 'rgba(201,123,46,0.12)' }]}
-              onPress={() => { setLivroParaResenhar(h); setTelaResenha(true); }}>
-              <Text style={[s.badgeText, { color: CORES.amber }]}>✎ Editar</Text>
+        )}
+        {carregando ? <ActivityIndicator color={CORES.amber} size="large" style={{ marginTop: 40 }} /> : (
+          <>
+            {emprestimosAtivos.length > 0 && (
+              <>
+                <Text style={s.sectionLabel}>MEU EMPRÉSTIMO ATIVO</Text>
+                {emprestimosAtivos.slice(0, 1).map(emp => {
+                  const livroDoEmprestimo = livros.find(livro => livro.id === emp.livroId);
+                  const tituloLivro = emp.livroTitulo || livroDoEmprestimo?.titulo || `Livro #${emp.livroId}`;
+                  return (
+                    <View key={emp.id} style={s.loanCard}>
+                      <View style={[s.loanCover, { backgroundColor: CORES.sage }]} />
+                      <View style={s.loanInfo}>
+                        <Text style={s.loanTitle}>{tituloLivro}</Text>
+                        <Text style={s.loanAuthor}>Status: {emp.status}</Text>
+                        <View style={s.progressBar}>
+                          <View style={[s.progressFill, { width: `${calcularProgresso(emp)}%` }]} />
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })}
+              </>
+            )}
+            <Text style={s.sectionLabel}>ACERVO DISPONÍVEL</Text>
+            {livros.length === 0 ? (
+              <View style={s.emptyBox}>
+                <Text style={s.emptyText}>Nenhum livro no acervo ainda</Text>
+              </View>
+            ) : livros.map(livro => (
+              <TouchableOpacity key={livro.id} style={s.loanCard} onPress={() => setLivroSelecionado(livro)}>
+                <View style={[s.loanCover, { backgroundColor: CORES.ink }]} />
+                <View style={s.loanInfo}>
+                  <Text style={s.loanTitle}>{livro.titulo}</Text>
+                  <Text style={s.loanAuthor}>{livro.autor}</Text>
+                  <View style={[s.badgeSmall, { backgroundColor: livro.disponiveis > 0 ? 'rgba(74,124,89,0.12)' : 'rgba(184,76,46,0.12)' }]}>
+                    <Text style={[s.badgeText, { color: livro.disponiveis > 0 ? CORES.sage : CORES.rust }]}>
+                      {livro.disponiveis > 0 ? `✓ ${livro.disponiveis} disponível(is)` : '✗ Indisponível'}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={{ color: CORES.muted, fontSize: 20 }}>›</Text>
+              </TouchableOpacity>
+            ))}
+          </>
+        )}
+      </View>
+    </ScrollView>
+  );
+
+  function renderBusca() {
+    return (
+      <ScrollView style={{ flex: 1 }}>
+        <View style={s.homeHeader}>
+          <View>
+            <Text style={s.homeGreeting}>Explorar acervo</Text>
+            <Text style={s.homeName}>{livrosFiltrados.length} livros</Text>
+          </View>
+        </View>
+        <View style={{ padding: 16 }}>
+          <TouchableOpacity style={[s.btnSecundario, { marginBottom: 10 }]} onPress={() => carregarDados()}>
+            <Text style={s.btnSecundarioText}>Atualizar acervo</Text>
+          </TouchableOpacity>
+          <TextInput style={[s.input, { marginBottom: 12 }]}
+            placeholder="🔍  Buscar por título ou autor..."
+            placeholderTextColor={CORES.muted}
+            value={buscaTexto} onChangeText={setBuscaTexto} />
+          <Text style={s.sectionLabel}>DISPONIBILIDADE</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {[
+                { key: 'todos', label: 'Todos' },
+                { key: 'disponivel', label: '✓ Disponível' },
+                { key: 'indisponivel', label: '✗ Indisponível' },
+              ].map(f => (
+                <TouchableOpacity key={f.key}
+                  style={[s.filtroBtn, filtroDisp === f.key && s.filtroBtnAtivo]}
+                  onPress={() => setFiltroDisp(f.key)}>
+                  <Text style={[s.filtroText, filtroDisp === f.key && s.filtroTextAtivo]}>{f.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+          <Text style={s.sectionLabel}>GÊNERO</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {generosUnicos.map(g => (
+                <TouchableOpacity key={g}
+                  style={[s.filtroBtn, filtroGenero === g && s.filtroBtnAtivo]}
+                  onPress={() => setFiltroGenero(g)}>
+                  <Text style={[s.filtroText, filtroGenero === g && s.filtroTextAtivo]}>
+                    {g === 'todos' ? 'Todos' : g}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+          {carregando ? (
+            <ActivityIndicator color={CORES.amber} size="large" style={{ marginTop: 40 }} />
+          ) : livrosFiltrados.length === 0 ? (
+            <View style={s.emptyBox}>
+              <Text style={s.emptyText}>Nenhum livro encontrado{'\n'}Tente outros filtros</Text>
+            </View>
+          ) : livrosFiltrados.map(livro => (
+            <TouchableOpacity key={livro.id} style={s.loanCard} onPress={() => setLivroSelecionado(livro)}>
+              <View style={[s.loanCover, { backgroundColor: CORES.ink }]} />
+              <View style={s.loanInfo}>
+                <Text style={s.loanTitle}>{livro.titulo}</Text>
+                <Text style={s.loanAuthor}>{livro.autor}</Text>
+                {livro.genero ? <Text style={[s.loanAuthor, { color: CORES.amber }]}>{livro.genero}</Text> : null}
+                <View style={[s.badgeSmall, { backgroundColor: livro.disponiveis > 0 ? 'rgba(74,124,89,0.12)' : 'rgba(184,76,46,0.12)' }]}>
+                  <Text style={[s.badgeText, { color: livro.disponiveis > 0 ? CORES.sage : CORES.rust }]}>
+                    {livro.disponiveis > 0 ? `✓ ${livro.disponiveis} disponível(is)` : '✗ Indisponível'}
+                  </Text>
+                </View>
+              </View>
+              <View style={{ alignItems: 'center', gap: 2 }}>
+                <TouchableOpacity
+                  onPress={() => handleToggleDesejo(livro)}
+                  disabled={togglendoDesejo === livro.id}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Text style={{ fontSize: 20, opacity: togglendoDesejo === livro.id ? 0.4 : 1 }}>
+                    {desejos.find(d => d.livroId === livro.id) ? '❤️' : '🤍'}
+                  </Text>
+                </TouchableOpacity>
+                <Text style={{ color: CORES.muted, fontSize: 20 }}>›</Text>
+              </View>
             </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
+    );
+  }
+
+  const renderEscreverResenha = () => {
+    const livroObj = livros.find(l => l.id === livroParaResenhar?.livroId);
+    const minhaAvaliacao = todasAvaliacoes.find(
+      a => a.usuarioId === usuario?.id && a.livroId === livroParaResenhar?.livroId
+    );
+    const fecharResenha = () => {
+      setTelaResenha(false);
+      setLivroParaResenhar(null);
+      setNotaResenha(0);
+      setTextoResenha('');
+    };
+    return (
+      <ScrollView style={{ flex: 1 }}>
+        <View style={s.homeHeader}>
+          <TouchableOpacity onPress={fecharResenha} style={{ marginRight: 12 }}>
+            <Text style={{ color: CORES.amberLt, fontSize: 16, fontWeight: '700' }}>← Voltar</Text>
+          </TouchableOpacity>
+          <Text style={s.homeGreeting}>Avaliação de livro</Text>
+        </View>
+        <View style={{ padding: 20 }}>
+          <View style={s.detalheCard}>
+            {livroObj?.capa ? (
+              <Image source={{ uri: livroObj.capa }} style={s.detalheCover} resizeMode="cover" />
+            ) : (
+              <View style={[s.detalheCover, { backgroundColor: CORES.muted }]} />
+            )}
+            <View style={{ flex: 1 }}>
+              <Text style={s.detalheTitulo}>{livroParaResenhar?.livroTitulo}</Text>
+              <Text style={s.detalheAutor}>{livroParaResenhar?.livroAutor || '—'}</Text>
+              {livroParaResenhar?.dataDevolucao ? (
+                <Text style={[s.loanAuthor, { marginTop: 6 }]}>
+                  Devolvido em {new Date(livroParaResenhar.dataDevolucao).toLocaleDateString('pt-BR')}
+                </Text>
+              ) : null}
+            </View>
+          </View>
+          {minhaAvaliacao ? (
+            <View style={s.resenhaJaCard}>
+              <Text style={s.sectionLabel}>SUA AVALIAÇÃO</Text>
+              <View style={{ flexDirection: 'row', gap: 4, marginVertical: 10 }}>
+                {[1,2,3,4,5].map(i => (
+                  <Text key={i} style={{ fontSize: 30, color: i <= minhaAvaliacao.nota ? CORES.amber : CORES.border }}>★</Text>
+                ))}
+              </View>
+              {minhaAvaliacao.resenha ? (
+                <Text style={s.resenhaTexto}>"{minhaAvaliacao.resenha}"</Text>
+              ) : null}
+              <Text style={[s.loanAuthor, { marginTop: 8 }]}>
+                Enviado em {new Date(minhaAvaliacao.criadoEm).toLocaleDateString('pt-BR')}
+              </Text>
+            </View>
           ) : (
-            <TouchableOpacity
-              style={[s.btnAmber, { paddingHorizontal: 10 }]}
-              onPress={() => { setNotaResenha(0); setTextoResenha(''); setLivroParaResenhar(h); setTelaResenha(true); }}>
-              <Text style={s.btnAmberText}>⭐ Avaliar</Text>
-            </TouchableOpacity>
+            <>
+              <Text style={s.sectionLabel}>SUA NOTA *</Text>
+              <View style={{ flexDirection: 'row', gap: 6, marginBottom: 20, justifyContent: 'center' }}>
+                {[1,2,3,4,5].map(i => (
+                  <TouchableOpacity key={i} onPress={() => setNotaResenha(i)}>
+                    <Text style={{ fontSize: 42, color: i <= notaResenha ? CORES.amber : CORES.border }}>★</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <Text style={s.sectionLabel}>RESENHA (OPCIONAL)</Text>
+              <TextInput
+                style={[s.input, { height: 120, textAlignVertical: 'top', paddingTop: 12 }]}
+                placeholder="Conte o que achou do livro, personagens, história..."
+                placeholderTextColor={CORES.muted}
+                value={textoResenha}
+                onChangeText={setTextoResenha}
+                multiline
+                maxLength={1000}
+              />
+              <Text style={[s.loanAuthor, { textAlign: 'right', marginTop: 4 }]}>{textoResenha.length}/1000</Text>
+              <TouchableOpacity
+                style={[s.btnDetalheReserva, { marginTop: 16, opacity: enviandoResenha ? 0.7 : 1 }]}
+                onPress={handleEnviarResenha}
+                disabled={enviandoResenha}>
+                {enviandoResenha
+                  ? <ActivityIndicator color={CORES.ink} />
+                  : <Text style={s.btnDetalheReservaText}>⭐ Enviar avaliação</Text>}
+              </TouchableOpacity>
+            </>
           )}
         </View>
-        );
-      })}
-    </View>
-  </ScrollView>
-);
-
-  if (tela === 'bibliotecario') {
-    const renderFormularioLivro = () => (
-      <View style={s.qrValidationBox}>
-        <TextInput
-          style={[s.input, { marginBottom: 8 }]}
-          placeholder="Título *"
-          placeholderTextColor={CORES.muted}
-          value={livroTituloNovo}
-          onChangeText={setLivroTituloNovo}
-        />
-        <TextInput
-          style={[s.input, { marginBottom: 8 }]}
-          placeholder="Autor"
-          placeholderTextColor={CORES.muted}
-          value={livroAutorNovo}
-          onChangeText={setLivroAutorNovo}
-        />
-        <TextInput
-          style={[s.input, { marginBottom: 8 }]}
-          placeholder="Gênero"
-          placeholderTextColor={CORES.muted}
-          value={livroGeneroNovo}
-          onChangeText={setLivroGeneroNovo}
-        />
-        <TextInput
-          style={[s.input, { marginBottom: 8 }]}
-          placeholder="Total de exemplares"
-          placeholderTextColor={CORES.muted}
-          value={livroTotalNovo}
-          onChangeText={setLivroTotalNovo}
-          keyboardType="number-pad"
-        />
-        <TouchableOpacity
-          style={[s.btnPrimary, { opacity: salvandoLivro ? 0.7 : 1 }]}
-          onPress={handleCriarLivro}
-          disabled={salvandoLivro}>
-          {salvandoLivro
-            ? <ActivityIndicator color={CORES.ink} />
-            : <Text style={s.btnPrimaryText}>Cadastrar livro</Text>}
-        </TouchableOpacity>
-      </View>
+      </ScrollView>
     );
+  };
 
+  const renderQrRetirada = () => {
+    const payload = dadosQrRetirada?.payload || '';
+    const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(payload)}`;
+    const expiraEm = dadosQrRetirada?.expiraEm
+      ? new Date(dadosQrRetirada.expiraEm).toLocaleString('pt-BR')
+      : '---';
+    return (
+      <ScrollView style={{ flex: 1 }}>
+        <View style={s.homeHeader}>
+          <TouchableOpacity onPress={() => setTelaQrRetirada(false)} style={{ marginRight: 12 }}>
+            <Text style={{ color: CORES.amberLt, fontSize: 16, fontWeight: '700' }}>← Voltar</Text>
+          </TouchableOpacity>
+          <Text style={[s.homeGreeting, { flex: 1 }]}>QR para retirada física</Text>
+        </View>
+        <View style={{ padding: 16 }}>
+          <View style={s.qrCard}>
+            <Text style={s.qrTitle}>{emprestimoQrAtual?.livroTitulo || 'Empréstimo selecionado'}</Text>
+            <Text style={s.qrSub}>Mostre este QR no balcão da biblioteca</Text>
+            {payload ? (
+              <Image source={{ uri: qrImageUrl }} style={s.qrImage} resizeMode="contain" />
+            ) : null}
+            <Text style={s.qrCodeText}>{dadosQrRetirada?.codigo || '---'}</Text>
+            <Text style={s.qrExpireText}>Válido até: {expiraEm}</Text>
+          </View>
+        </View>
+      </ScrollView>
+    );
+  };
+
+  const renderMeusLivros = () => (
+    <ScrollView style={{ flex: 1 }}>
+      <View style={s.homeHeader}>
+        <View>
+          <Text style={s.homeGreeting}>Minhas Reservas</Text>
+          <Text style={s.homeName}>{emprestimosAtivos.length + historico.length} livros</Text>
+        </View>
+      </View>
+      <View style={{ padding: 16 }}>
+        <Text style={s.sectionLabel}>EMPRÉSTIMOS ATIVOS</Text>
+        {emprestimosAtivos.map(emp => (
+          <View key={emp.id} style={s.loanCard}>
+            <View style={[s.loanCover, { backgroundColor: CORES.sage }]} />
+            <View style={s.loanInfo}>
+              <Text style={s.loanTitle}>{emp.livroTitulo || `Livro #${emp.livroId}`}</Text>
+              <Text style={s.loanAuthor}>{emp.livroAutor || '—'}</Text>
+              <View style={[s.badgeSmall, { backgroundColor: 'rgba(201,123,46,0.12)', marginTop: 6 }]}>
+                <Text style={[s.badgeText, { color: CORES.amber }]}>
+                  {emp.renovado ? '🔄 Renovado' : emp.status}
+                </Text>
+              </View>
+              {emp.dataReserva ? (
+                <Text style={[s.loanAuthor, { marginTop: 4 }]}>
+                  Reservado em {new Date(emp.dataReserva).toLocaleDateString('pt-BR')}
+                </Text>
+              ) : null}
+            </View>
+            <View style={{ gap: 6 }}>
+              {emp.status === 'reservado' ? (
+                <TouchableOpacity
+                  style={[s.btnAmber, { paddingHorizontal: 8, opacity: gerandoQrRetirada ? 0.7 : 1 }]}
+                  onPress={() => handleGerarQrRetirada(emp)}
+                  disabled={gerandoQrRetirada}>
+                  <Text style={s.btnAmberText}>📱 QR retirada</Text>
+                </TouchableOpacity>
+              ) : null}
+              {emp.status === 'retirado' && !emp.renovado && (
+                <TouchableOpacity
+                  style={[s.btnAmber, { paddingHorizontal: 8 }]}
+                  onPress={() => handleRenovar(emp)}>
+                  <Text style={s.btnAmberText}>🔄 Renovar</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        ))}
+        <Text style={[s.sectionLabel, { marginTop: 16 }]}>HISTÓRICO</Text>
+        {historico.length === 0 ? (
+          <View style={s.emptyBox}>
+            <Text style={s.emptyText}>Nenhuma devolução registrada</Text>
+          </View>
+        ) : historico.map(h => {
+          const minhaAv = todasAvaliacoes.find(a => a.usuarioId === usuario?.id && a.livroId === h.livroId);
+          return (
+            <View key={h.id} style={s.loanCard}>
+              <View style={[s.loanCover, { backgroundColor: CORES.muted }]} />
+              <View style={s.loanInfo}>
+                <Text style={s.loanTitle}>{h.livroTitulo || `Livro #${h.livroId}`}</Text>
+                <Text style={s.loanAuthor}>{h.livroAutor || '—'}</Text>
+                {h.dataDevolucao ? (
+                  <Text style={[s.loanAuthor, { marginTop: 4 }]}>
+                    Devolvido em {new Date(h.dataDevolucao).toLocaleDateString('pt-BR')}
+                  </Text>
+                ) : null}
+                {minhaAv ? (
+                  <View style={{ flexDirection: 'row', gap: 2, marginTop: 6 }}>
+                    {[1,2,3,4,5].map(i => (
+                      <Text key={i} style={{ fontSize: 13, color: i <= minhaAv.nota ? CORES.amber : CORES.border }}>★</Text>
+                    ))}
+                  </View>
+                ) : null}
+              </View>
+              {minhaAv ? (
+                <TouchableOpacity
+                  style={[s.badgeSmall, { backgroundColor: 'rgba(201,123,46,0.12)' }]}
+                  onPress={() => { setLivroParaResenhar(h); setTelaResenha(true); }}>
+                  <Text style={[s.badgeText, { color: CORES.amber }]}>✎ Editar</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={[s.btnAmber, { paddingHorizontal: 10 }]}
+                  onPress={() => { setNotaResenha(0); setTextoResenha(''); setLivroParaResenhar(h); setTelaResenha(true); }}>
+                  <Text style={s.btnAmberText}>⭐ Avaliar</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          );
+        })}
+      </View>
+    </ScrollView>
+  );
+
+  const renderListaDesejos = () => (
+    <ScrollView style={{ flex: 1 }}>
+      <View style={s.homeHeader}>
+        <TouchableOpacity onPress={() => setTelaListaDesejos(false)} style={{ marginRight: 12 }}>
+          <Text style={{ color: CORES.amberLt, fontSize: 16, fontWeight: '700' }}>← Voltar</Text>
+        </TouchableOpacity>
+        <View style={{ flex: 1 }}>
+          <Text style={s.homeGreeting}>Lista de Desejos</Text>
+          <Text style={s.homeName}>{desejos.length} título(s)</Text>
+        </View>
+      </View>
+      <View style={{ padding: 16 }}>
+        {desejos.length === 0 ? (
+          <View style={s.emptyBox}>
+            <Text style={{ fontSize: 40, textAlign: 'center', marginBottom: 12 }}>🤍</Text>
+            <Text style={s.emptyText}>
+              Sua lista de desejos está vazia.{'\n'}
+              Toque em 🤍 em qualquer livro para salvar.
+            </Text>
+          </View>
+        ) : desejos.map(d => {
+          const livroAtual = livros.find(l => l.id === d.livroId);
+          const disp = livroAtual?.disponiveis ?? 0;
+          return (
+            <View key={d.id} style={s.loanCard}>
+              {d.livroCapa ? (
+                <Image source={{ uri: d.livroCapa }} style={s.loanCover} resizeMode="cover" />
+              ) : (
+                <View style={[s.loanCover, { backgroundColor: CORES.ink }]} />
+              )}
+              <View style={s.loanInfo}>
+                <Text style={s.loanTitle}>{d.livroTitulo}</Text>
+                <Text style={s.loanAuthor}>{d.livroAutor || '—'}</Text>
+                {d.livroGenero ? (
+                  <Text style={[s.loanAuthor, { color: CORES.amber }]}>{d.livroGenero}</Text>
+                ) : null}
+                <View style={[s.badgeSmall, { backgroundColor: disp > 0 ? 'rgba(74,124,89,0.12)' : 'rgba(184,76,46,0.12)', marginTop: 6 }]}>
+                  <Text style={[s.badgeText, { color: disp > 0 ? CORES.sage : CORES.rust }]}>
+                    {disp > 0 ? `✓ Disponível` : '✗ Indisponível'}
+                  </Text>
+                </View>
+              </View>
+              <View style={{ gap: 8, alignItems: 'center' }}>
+                {disp > 0 && livroAtual ? (
+                  <TouchableOpacity
+                    style={[s.btnAmber, { paddingHorizontal: 10 }]}
+                    onPress={() => {
+                      setTelaListaDesejos(false);
+                      setAbaAtiva('buscar');
+                      setLivroSelecionado(livroAtual);
+                    }}>
+                    <Text style={s.btnAmberText}>Reservar</Text>
+                  </TouchableOpacity>
+                ) : null}
+                <TouchableOpacity
+                  onPress={() => handleToggleDesejo({ id: d.livroId })}
+                  disabled={togglendoDesejo === d.livroId}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                  <Text style={{ fontSize: 20, opacity: togglendoDesejo === d.livroId ? 0.4 : 1 }}>❤️</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    </ScrollView>
+  );
+
+  const renderPerfil = () => {
+    const avaliacoesAluno = todasAvaliacoes.filter(a => a.usuarioId === usuario?.id);
+    const livrosConcluidos = historico.length;
+    const metasLeitura = [
+      { id: 'meta-1', icon: '🌱', nome: 'Primeiros Passos', descricao: 'Concluir 1 leitura', progresso: livrosConcluidos, meta: 1 },
+      { id: 'meta-2', icon: '📖', nome: 'Leitor Dedicado', descricao: 'Concluir 5 leituras', progresso: livrosConcluidos, meta: 5 },
+      { id: 'meta-3', icon: '🏆', nome: 'Mestre da Biblioteca', descricao: 'Concluir 10 leituras', progresso: livrosConcluidos, meta: 10 },
+      { id: 'meta-4', icon: '⭐', nome: 'Crítico Literário', descricao: 'Enviar 3 avaliações', progresso: avaliacoesAluno.length, meta: 3 },
+      { id: 'meta-5', icon: '💡', nome: 'Explorador de Títulos', descricao: 'Salvar 5 livros na lista de desejos', progresso: desejos.length, meta: 5 },
+    ];
+    return (
+      <ScrollView style={{ flex: 1 }}>
+        <View style={s.perfilTop}>
+          <View style={s.perfilAvatar}>
+            <Text style={s.perfilAvatarText}>{usuario?.iniciais}</Text>
+          </View>
+          <Text style={s.perfilName}>{usuario?.nome}</Text>
+          <Text style={s.perfilSub}>Turma {usuario?.turma} · {usuario?.email}</Text>
+          <View style={s.perfilStats}>
+            {[
+              { num: historico.length + emprestimosAtivos.length, label: 'Lidos' },
+              { num: emprestimosAtivos.length, label: 'Ativos' },
+              { num: desejos.length, label: 'Desejos' },
+            ].map((st, i) => (
+              <View key={i} style={s.perfilStat}>
+                <Text style={s.perfilStatNum}>{st.num}</Text>
+                <Text style={s.perfilStatLabel}>{st.label}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+        <View style={{ padding: 16 }}>
+          {[
+            { icon: '📚', title: 'Histórico de Empréstimos', sub: `${historico.length} livros lidos` },
+            { icon: '🤍', title: 'Minha Lista de Desejos', sub: `${desejos.length} título(s) salvos` },
+            { icon: '🔔', title: 'Notificações', sub: 'Configurar alertas' },
+            { icon: '✏️', title: 'Editar perfil', sub: 'Atualizar informações' },
+          ].map((item, i) => (
+            <TouchableOpacity key={i} style={s.menuItem}
+              onPress={i === 1 ? () => setTelaListaDesejos(true) : undefined}>
+              <View style={s.menuIcon}><Text style={{ fontSize: 18 }}>{item.icon}</Text></View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.menuTitle}>{item.title}</Text>
+                <Text style={s.menuSub}>{item.sub}</Text>
+              </View>
+              <Text style={s.menuArrow}>›</Text>
+            </TouchableOpacity>
+          ))}
+          <Text style={[s.sectionLabel, { marginTop: 20 }]}>SELOS DE LEITURA</Text>
+          <View style={s.selosGrid}>
+            {metasLeitura.map(selo => {
+              const desbloqueado = selo.progresso >= selo.meta;
+              const percentual = Math.min(100, Math.round((selo.progresso / selo.meta) * 100));
+              return (
+                <View key={selo.id} style={[s.seloCard, !desbloqueado && s.seloCardLocked]}>
+                  <View style={s.seloHeader}>
+                    <Text style={s.seloIcon}>{selo.icon}</Text>
+                    <View style={[s.badgeSmall, { marginTop: 0, backgroundColor: desbloqueado ? 'rgba(74,124,89,0.15)' : 'rgba(138,125,104,0.15)' }]}>
+                      <Text style={[s.badgeText, { color: desbloqueado ? CORES.sage : CORES.muted }]}>
+                        {desbloqueado ? 'Desbloqueado' : `${percentual}%`}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={s.seloTitulo}>{selo.nome}</Text>
+                  <Text style={s.seloDesc}>{selo.descricao}</Text>
+                  <View style={s.seloBarraBg}>
+                    <View style={[s.seloBarraFill, { width: `${percentual}%` }]} />
+                  </View>
+                  <Text style={s.seloMeta}>{Math.min(selo.progresso, selo.meta)}/{selo.meta}</Text>
+                </View>
+              );
+            })}
+          </View>
+          <TouchableOpacity style={s.logoutBtn} onPress={handleLogout}>
+            <Text style={s.logoutText}>Sair da conta</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    );
+  };
+
+  // ── PAINEL BIBLIOTECÁRIO ──
+  if (tela === 'bibliotecario') {
     const renderDashboard = () => (
       <ScrollView style={{ flex: 1 }}>
         <View style={s.homeHeader}>
@@ -1397,9 +1961,7 @@ async function handleAplicarSuspensao(emp: Emprestimo, dias: number, motivo: str
                   style={[s.btnPrimary, { opacity: validandoQrRetirada ? 0.7 : 1 }]}
                   onPress={handleValidarQrRetirada}
                   disabled={validandoQrRetirada}>
-                  {validandoQrRetirada
-                    ? <ActivityIndicator color={CORES.ink} />
-                    : <Text style={s.btnPrimaryText}>Confirmar retirada via QR</Text>}
+                  {validandoQrRetirada ? <ActivityIndicator color={CORES.ink} /> : <Text style={s.btnPrimaryText}>Confirmar retirada via QR</Text>}
                 </TouchableOpacity>
               </View>
               <Text style={s.sectionLabel}>EMPRÉSTIMOS ATIVOS</Text>
@@ -1409,40 +1971,40 @@ async function handleAplicarSuspensao(emp: Emprestimo, dias: number, motivo: str
                 </View>
               ) : emprestimosAtivos.map(emp => (
                 <View key={emp.id} style={s.loanCard}>
-  <View style={[s.loanCover, { backgroundColor: CORES.sage }]} />
-  <View style={s.loanInfo}>
-    <Text style={s.loanTitle}>{emp.livroTitulo || `Livro #${emp.livroId}`}</Text>
-    <Text style={s.loanAuthor}>{emp.usuarioNome || `Usuário #${emp.usuarioId}`}</Text>
-    {emp.usuarioTurma ? (
-      <Text style={[s.loanAuthor, { color: CORES.amber }]}>Turma {emp.usuarioTurma}</Text>
-    ) : null}
-    <View style={[s.badgeSmall, { backgroundColor: 'rgba(201,123,46,0.12)', marginTop: 6 }]}>
-      <Text style={[s.badgeText, { color: CORES.amber }]}>{emp.status}</Text>
-    </View>
-  </View>
-  <TouchableOpacity style={s.btnAmber} onPress={() => handleDevolucao(emp)}>
-    <Text style={s.btnAmberText}>Devolver</Text>
-  </TouchableOpacity>
-  <TouchableOpacity
-  style={[s.btnAmber, { backgroundColor: CORES.rust, paddingHorizontal: 8, marginTop: 4 }]}
-  onPress={() => {
-    Alert.prompt(
-      'Bloquear aluno',
-      'Quantos dias de bloqueio?',
-      (dias) => {
-        if (!dias || isNaN(Number(dias))) return;
-        Alert.prompt('Motivo', 'Informe o motivo (opcional)', (motivo) => {
-          handleAplicarSuspensao(emp, Number(dias), motivo || 'Devolução em atraso');
-        });
-      },
-      'plain-text',
-      '',
-      'number-pad'
-    );
-  }}>
-  <Text style={s.btnAmberText}>🚫 Bloquear</Text>
-</TouchableOpacity>
-</View>
+                  <View style={[s.loanCover, { backgroundColor: CORES.sage }]} />
+                  <View style={s.loanInfo}>
+                    <Text style={s.loanTitle}>{emp.livroTitulo || `Livro #${emp.livroId}`}</Text>
+                    <Text style={s.loanAuthor}>{emp.usuarioNome || `Usuário #${emp.usuarioId}`}</Text>
+                    {emp.usuarioTurma ? (
+                      <Text style={[s.loanAuthor, { color: CORES.amber }]}>Turma {emp.usuarioTurma}</Text>
+                    ) : null}
+                    <View style={[s.badgeSmall, { backgroundColor: 'rgba(201,123,46,0.12)', marginTop: 6 }]}>
+                      <Text style={[s.badgeText, { color: CORES.amber }]}>{emp.status}</Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity style={s.btnAmber} onPress={() => handleDevolucao(emp)}>
+                    <Text style={s.btnAmberText}>Devolver</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[s.btnAmber, { backgroundColor: CORES.rust, paddingHorizontal: 8, marginTop: 4 }]}
+                    onPress={() => {
+                      Alert.prompt(
+                        'Bloquear aluno',
+                        'Quantos dias de bloqueio?',
+                        (dias) => {
+                          if (!dias || isNaN(Number(dias))) return;
+                          Alert.prompt('Motivo', 'Informe o motivo (opcional)', (motivo) => {
+                            handleAplicarSuspensao(emp, Number(dias), motivo || 'Devolução em atraso');
+                          });
+                        },
+                        'plain-text',
+                        '',
+                        'number-pad'
+                      );
+                    }}>
+                    <Text style={s.btnAmberText}>🚫 Bloquear</Text>
+                  </TouchableOpacity>
+                </View>
               ))}
             </>
           )}
@@ -1467,10 +2029,10 @@ async function handleAplicarSuspensao(emp: Emprestimo, dias: number, motivo: str
             ) : livros.map(livro => (
               <View key={livro.id} style={s.loanCard}>
                 {livro.capa ? (
-              <Image source={{ uri: livro.capa }} style={s.loanCover} resizeMode="cover" />
-              ) : (
-              <View style={[s.loanCover, { backgroundColor: CORES.ink }]} />
-              )}
+                  <Image source={{ uri: livro.capa }} style={s.loanCover} resizeMode="cover" />
+                ) : (
+                  <View style={[s.loanCover, { backgroundColor: CORES.ink }]} />
+                )}
                 <View style={s.loanInfo}>
                   <Text style={s.loanTitle}>{livro.titulo}</Text>
                   <Text style={s.loanAuthor}>{livro.autor}</Text>
@@ -1496,11 +2058,78 @@ async function handleAplicarSuspensao(emp: Emprestimo, dias: number, motivo: str
           </View>
         </View>
         <View style={{ padding: 16 }}>
-          <Text style={s.sectionLabel}>CADASTRO RÁPIDO DE LIVRO</Text>
-          {renderFormularioLivro()}
-          <TouchableOpacity style={[s.btnSecundario, { marginBottom: 12 }]} onPress={() => carregarDados()}>
+
+          {/* ── CADASTRO POR FOTO ── */}
+          <Text style={s.sectionLabel}>CADASTRAR LIVRO POR FOTO</Text>
+          <View style={s.qrValidationBox}>
+            <Text style={[s.loanAuthor, { textAlign: 'center', marginBottom: 12 }]}>
+              📸 Tire uma foto da capa do livro e a IA identifica os dados automaticamente
+            </Text>
+            <TouchableOpacity
+              style={[s.btnPrimary, { opacity: scanandoCapa ? 0.7 : 1 }]}
+              onPress={handleScanCapa}
+              disabled={scanandoCapa}>
+              {scanandoCapa
+                ? <ActivityIndicator color={CORES.ink} />
+                : <Text style={s.btnPrimaryText}>📷 Fotografar capa</Text>}
+            </TouchableOpacity>
+
+            {livroScaneado && (
+              <View style={{ marginTop: 16 }}>
+                <Text style={[s.sectionLabel, { marginTop: 0 }]}>DADOS IDENTIFICADOS</Text>
+                <View style={[s.loanCard, { flexDirection: 'column', gap: 8 }]}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={[s.loanAuthor, { fontWeight: '700', color: CORES.muted }]}>Título</Text>
+                    <Text style={[s.loanTitle, { flex: 1, textAlign: 'right' }]}>{livroScaneado.titulo}</Text>
+                  </View>
+                  {livroScaneado.autor ? (
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text style={[s.loanAuthor, { fontWeight: '700', color: CORES.muted }]}>Autor</Text>
+                      <Text style={[s.loanAuthor, { flex: 1, textAlign: 'right' }]}>{livroScaneado.autor}</Text>
+                    </View>
+                  ) : null}
+                  {livroScaneado.genero ? (
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text style={[s.loanAuthor, { fontWeight: '700', color: CORES.muted }]}>Gênero</Text>
+                      <Text style={[s.loanAuthor, { flex: 1, textAlign: 'right' }]}>{livroScaneado.genero}</Text>
+                    </View>
+                  ) : null}
+                  {livroScaneado.sinopse ? (
+                    <View>
+                      <Text style={[s.loanAuthor, { fontWeight: '700', color: CORES.muted }]}>Sinopse</Text>
+                      <Text style={[s.loanAuthor, { marginTop: 4 }]}>{livroScaneado.sinopse}</Text>
+                    </View>
+                  ) : null}
+                </View>
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+                  <TouchableOpacity
+                    style={[s.btnDetalheVoltar, { flex: 1 }]}
+                    onPress={() => setLivroScaneado(null)}>
+                    <Text style={s.btnDetalheVoltarText}>Descartar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[s.btnDetalheReserva, { flex: 2, opacity: salvandoScan ? 0.7 : 1 }]}
+                    onPress={handleSalvarLivroScaneado}
+                    disabled={salvandoScan}>
+                    {salvandoScan
+                      ? <ActivityIndicator color={CORES.ink} />
+                      : <Text style={s.btnDetalheReservaText}>✓ Confirmar cadastro</Text>}
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity
+                  style={[s.btnSecundario, { marginTop: 8 }]}
+                  onPress={handleScanCapa}
+                  disabled={scanandoCapa}>
+                  <Text style={s.btnSecundarioText}>📷 Fotografar novamente</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+
+          <TouchableOpacity style={[s.btnSecundario, { marginBottom: 12, marginTop: 8 }]} onPress={() => carregarDados()}>
             <Text style={s.btnSecundarioText}>Atualizar dados do painel</Text>
           </TouchableOpacity>
+
           <Text style={s.sectionLabel}>USUÁRIOS CADASTRADOS</Text>
           {usuariosAdmin.length === 0 ? (
             <View style={s.emptyBox}>
@@ -1592,7 +2221,7 @@ async function handleAplicarSuspensao(emp: Emprestimo, dias: number, motivo: str
         </View>
       </SafeAreaView>
     );
-   
+
     const abasBiblio = [
       { key: 'dashboard', icon: '📊', label: 'Painel' },
       { key: 'gestao', icon: '📚', label: 'Gestão' },
@@ -1609,7 +2238,7 @@ async function handleAplicarSuspensao(emp: Emprestimo, dias: number, motivo: str
           {!telaScannerQr && abaBiblio === 'gestao' && renderGestao()}
           {!telaScannerQr && abaBiblio === 'admin' && renderAdmin()}
           {!telaScannerQr && abaBiblio === 'perfil' && renderPerfilBiblio()}
-          {!telaScannerQr && abaBiblio === 'avisos' && renderNotificacoes()} 
+          {!telaScannerQr && abaBiblio === 'avisos' && renderNotificacoes()}
         </View>
         <View style={s.tabBar}>
           {abasBiblio.map(aba => (
@@ -1624,770 +2253,152 @@ async function handleAplicarSuspensao(emp: Emprestimo, dias: number, motivo: str
       </SafeAreaView>
     );
   }
+
   // ── TELAS DO PROFESSOR ──
-if (tela === 'professor') {
-  const renderHomeProfessor = () => (
-    <ScrollView style={{ flex: 1 }}>
-      <View style={s.homeHeader}>
-        <View>
-          <Text style={s.homeGreeting}>{saudacaoPorHorario}, Professor(a) 👋</Text>
-          <Text style={s.homeName}>{usuario?.nome}</Text>
-        </View>
-        <View style={s.homeAvatarSmall}>
-          <Text style={s.homeAvatarText}>{usuario?.iniciais}</Text>
-        </View>
-      </View>
-      <View style={{ padding: 16, gap: 12 }}>
-        <View style={s.searchBar}>
-          <Text style={{ fontSize: 14, marginRight: 6 }}>🔍</Text>
-          <Text style={s.searchPlaceholder}>Buscar livros, autores...</Text>
-        </View>
-        {carregando ? <ActivityIndicator color={CORES.amber} size="large" style={{ marginTop: 40 }} /> : (
-          <>
-            {emprestimosAtivos.length > 0 && (
-              <>
-                <Text style={s.sectionLabel}>MEUS EMPRÉSTIMOS ATIVOS</Text>
-                {emprestimosAtivos
-                  .filter(emp => emp.usuarioId === usuario?.id)
-                  .slice(0, 2).map(emp => (
-                  <View key={emp.id} style={s.loanCard}>
-                    {emp.livroTitulo && emp.capa ? (
-                      <Image source={{ uri: emp.capa }} style={s.loanCover} resizeMode="cover" />
-                    ) : (
-                      <View style={[s.loanCover, { backgroundColor: CORES.sage }]} />
-                      
-                    )}
-                    <View style={s.loanInfo}>
-                      <Text style={s.loanTitle}>{emp.livroTitulo || `Livro #${emp.livroId}`}</Text>
-                      <Text style={s.loanAuthor}>{emp.livroAutor || '—'}</Text>
-                      <View style={[s.badgeSmall, { backgroundColor: 'rgba(201,123,46,0.12)', marginTop: 6 }]}>
-                        <Text style={[s.badgeText, { color: CORES.amber }]}>{emp.status}</Text>
-                      </View>
-                    </View>
-                  </View>
-                ))}
-              </>
-            )}
-            <Text style={s.sectionLabel}>ACERVO DISPONÍVEL</Text>
-            {livros.length === 0 ? (
-              <View style={s.emptyBox}>
-                <Text style={s.emptyText}>Nenhum livro no acervo ainda</Text>
-              </View>
-            ) : livros.slice(0, 5).map(livro => (
-              <TouchableOpacity key={livro.id} style={s.loanCard} onPress={() => setLivroSelecionado(livro)}>
-                {livro.capa ? (
-                  <Image source={{ uri: livro.capa }} style={s.loanCover} resizeMode="cover" />
-                ) : (
-                  <View style={[s.loanCover, { backgroundColor: CORES.ink }]} />
-                )}
-                <View style={s.loanInfo}>
-                  <Text style={s.loanTitle}>{livro.titulo}</Text>
-                  <Text style={s.loanAuthor}>{livro.autor}</Text>
-                  <View style={[s.badgeSmall, { backgroundColor: livro.disponiveis > 0 ? 'rgba(74,124,89,0.12)' : 'rgba(184,76,46,0.12)' }]}>
-                    <Text style={[s.badgeText, { color: livro.disponiveis > 0 ? CORES.sage : CORES.rust }]}>
-                      {livro.disponiveis > 0 ? `✓ ${livro.disponiveis} disponível(is)` : '✗ Indisponível'}
-                    </Text>
-                  </View>
-                </View>
-                <Text style={{ color: CORES.muted, fontSize: 20 }}>›</Text>
-              </TouchableOpacity>
-            ))}
-          </>
-        )}
-      </View>
-    </ScrollView>
-  );
-
-  const renderTurmaProfessor = () => (
-    <ScrollView style={{ flex: 1 }}>
-      <View style={s.homeHeader}>
-        <View>
-          <Text style={s.homeGreeting}>Empréstimos da turma</Text>
-          <Text style={s.homeName}>{emprestimosAtivos.length} ativos</Text>
-        </View>
-      </View>
-      <View style={{ padding: 16 }}>
-        <Text style={s.sectionLabel}>TODOS OS EMPRÉSTIMOS ATIVOS</Text>
-        {carregando ? (
-          <ActivityIndicator color={CORES.amber} size="large" style={{ marginTop: 40 }} />
-        ) : emprestimosAtivos.length === 0 ? (
-          <View style={s.emptyBox}>
-            <Text style={s.emptyText}>Nenhum empréstimo ativo no momento</Text>
-          </View>
-        ) : emprestimosAtivos.map(emp => (
-          <View key={emp.id} style={s.loanCard}>
-            {emp.capa ? (
-              <Image source={{ uri: emp.capa }} style={s.loanCover} resizeMode="cover" />
-            ) : (
-              <View style={[s.loanCover, { backgroundColor: CORES.sage }]} />
-            )}
-            <View style={s.loanInfo}>
-              <Text style={s.loanTitle}>{emp.livroTitulo || `Livro #${emp.livroId}`}</Text>
-              <Text style={s.loanAuthor}>{emp.livroAutor || '—'}</Text>
-              <Text style={[s.loanAuthor, { color: CORES.amber, marginTop: 2 }]}>
-                👤 {emp.usuarioNome || `Aluno #${emp.usuarioId}`}
-                {emp.usuarioTurma ? ` · Turma ${emp.usuarioTurma}` : ''}
-              </Text>
-              <View style={[s.badgeSmall, { backgroundColor: 'rgba(201,123,46,0.12)', marginTop: 6 }]}>
-                <Text style={[s.badgeText, { color: CORES.amber }]}>{emp.status}</Text>
-              </View>
-            </View>
-          </View>
-        ))}
-      </View>
-    </ScrollView>
-  );
-
-  const renderPerfilProfessor = () => (
-    <ScrollView style={{ flex: 1 }}>
-      <View style={s.perfilTop}>
-        <View style={s.perfilAvatar}>
-          <Text style={s.perfilAvatarText}>{usuario?.iniciais}</Text>
-        </View>
-        <Text style={s.perfilName}>{usuario?.nome}</Text>
-        <Text style={s.perfilSub}>{usuario?.email}</Text>
-        <View style={s.perfilBadge}>
-          <Text style={s.perfilBadgeTitle}>{BIBLIOTECA}</Text>
-          <Text style={s.perfilBadgeSub}>{ESCOLA}</Text>
-        </View>
-      </View>
-      <View style={{ padding: 16 }}>
-        <View style={s.statsRow}>
-          {[
-            { num: emprestimosAtivos.filter(e => e.usuarioId === usuario?.id).length, label: 'Meus\nempréstimos' },
-            { num: historico.filter(h => h.usuarioId === usuario?.id).length, label: 'Total\nlidos' },
-            { num: emprestimosAtivos.length, label: 'Ativos\nna escola' },
-          ].map((st, i) => (
-            <View key={i} style={s.statCard}>
-              <Text style={s.statNum}>{st.num}</Text>
-              <Text style={s.statLabel}>{st.label}</Text>
-            </View>
-          ))}
-        </View>
-        {[
-          { icon: '📚', title: 'Meu histórico', sub: `${historico.filter(h => h.usuarioId === usuario?.id).length} livros lidos` },
-          { icon: '🔔', title: 'Notificações', sub: 'Configurar alertas' },
-          { icon: '✏️', title: 'Editar perfil', sub: 'Atualizar informações' },
-        ].map((item, i) => (
-          <TouchableOpacity key={i} style={s.menuItem}>
-            <View style={s.menuIcon}><Text style={{ fontSize: 18 }}>{item.icon}</Text></View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.menuTitle}>{item.title}</Text>
-              <Text style={s.menuSub}>{item.sub}</Text>
-            </View>
-            <Text style={s.menuArrow}>›</Text>
-          </TouchableOpacity>
-        ))}
-        <TouchableOpacity style={s.logoutBtn} onPress={handleLogout}>
-          <Text style={s.logoutText}>Sair da conta</Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
-  );
-
-  const abasProfessor = [
-    { key: 'home', icon: '🏠', label: 'Início' },
-    { key: 'buscar', icon: '🔍', label: 'Explorar' },
-    { key: 'turma', icon: '👥', label: 'Turma' },
-    { key: 'perfil', icon: '👤', label: 'Perfil' },
-  ];
-
-  return (
-    <SafeAreaView style={s.container}>
-      <View style={{ flex: 1 }}>
-        {abaProfessor === 'home' && !livroSelecionado && renderHomeProfessor()}
-        {abaProfessor === 'home' && livroSelecionado && renderDetalhe()}
-        {abaProfessor === 'buscar' && !livroSelecionado && renderBusca()}
-        {abaProfessor === 'buscar' && livroSelecionado && renderDetalhe()}
-        {abaProfessor === 'turma' && renderTurmaProfessor()}
-        {abaProfessor === 'perfil' && renderPerfilProfessor()}
-      </View>
-      <View style={s.tabBar}>
-        {abasProfessor.map(aba => (
-          <TouchableOpacity key={aba.key} style={s.tabItem}
-            onPress={() => { setAbaProfessor(aba.key as AbaProfessor); setLivroSelecionado(null); }}>
-            <Text style={{ fontSize: 20 }}>{aba.icon}</Text>
-            <Text style={[s.tabLabel, abaProfessor === aba.key && { color: CORES.amber, fontWeight: '600' }]}>
-              {aba.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </SafeAreaView>
-  );
-}
-  // ── TELAS DO ALUNO ──
-  function renderDetalhe() {
-    return (
-    <ScrollView style={{ flex: 1 }}>
-      <View style={s.homeHeader}>
-        <TouchableOpacity onPress={() => setLivroSelecionado(null)} style={{ marginRight: 12 }}>
-          <Text style={{ color: CORES.amberLt, fontSize: 16, fontWeight: '700' }}>← Voltar</Text>
-        </TouchableOpacity>
-        <Text style={[s.homeGreeting, { flex: 1 }]}>Detalhes do livro</Text>
-        {(() => {
-          const noDesejo = desejos.find(d => d.livroId === livroSelecionado?.id);
-          const carregando = togglendoDesejo === livroSelecionado?.id;
-          return (
-            <TouchableOpacity
-              onPress={() => livroSelecionado && handleToggleDesejo(livroSelecionado)}
-              disabled={carregando}
-              style={{ padding: 4 }}>
-              <Text style={{ fontSize: 24, opacity: carregando ? 0.4 : 1 }}>
-                {noDesejo ? '❤️' : '🤍'}
-              </Text>
-              <Text style={{ fontSize: 9, color: noDesejo ? CORES.amberLt : 'rgba(245,239,227,0.4)', textAlign: 'center' }}>
-                {noDesejo ? 'Salvo' : 'Salvar'}
-              </Text>
-            </TouchableOpacity>
-          );
-        })()}
-      </View>
-      <View style={{ padding: 20 }}>
-        <View style={s.detalheCard}>
-          {livroSelecionado?.capa ? (
-          <Image source={{ uri: livroSelecionado.capa }} style={s.detalheCover} resizeMode="cover" />
-          ) : (
-          <View style={[s.detalheCover, { backgroundColor: CORES.ink }]} />
-          )}
-          <View style={{ flex: 1 }}>
-            <Text style={s.detalheTitulo}>{livroSelecionado?.titulo}</Text>
-            <Text style={s.detalheAutor}>{livroSelecionado?.autor}</Text>
-            {livroSelecionado?.genero ? (
-              <View style={[s.badgeSmall, { backgroundColor: 'rgba(201,123,46,0.12)', marginTop: 8 }]}>
-                <Text style={[s.badgeText, { color: CORES.amber }]}>{livroSelecionado.genero}</Text>
-              </View>
-            ) : null}
-          </View>
-        </View>
-
-        <View style={s.detalheInfoRow}>
-          {[
-            { label: 'Exemplares', valor: livroSelecionado?.totalExemplares || 1 },
-            { label: 'Disponíveis', valor: livroSelecionado?.disponiveis || 0 },
-            { label: 'Prazo', valor: '14 dias' },
-          ].map((info, i) => (
-            <View key={i} style={s.detalheInfoChip}>
-              <Text style={s.detalheInfoLabel}>{info.label}</Text>
-              <Text style={[s.detalheInfoValor, {
-                color: info.label === 'Disponíveis'
-                  ? (livroSelecionado?.disponiveis > 0 ? CORES.sage : CORES.rust)
-                  : CORES.ink
-              }]}>{info.valor}</Text>
-            </View>
-          ))}
-        </View>
-
-        {livroSelecionado?.sinopse ? (
-          <View style={{ marginTop: 20 }}>
-            <Text style={s.sectionLabel}>SINOPSE</Text>
-            <Text style={s.detalheSinopse}>{livroSelecionado.sinopse}</Text>
-          </View>
-        ) : null}
-
-        <View style={{ marginTop: 24, gap: 12 }}>
-          {livroSelecionado?.disponiveis > 0 ? (
-            <TouchableOpacity style={s.btnDetalheReserva} onPress={() => handleReserva(livroSelecionado)}>
-              <Text style={s.btnDetalheReservaText}>✓ Confirmar reserva</Text>
-            </TouchableOpacity>
-          ) : (
-           <TouchableOpacity
-  style={[s.btnDetalheReserva, { backgroundColor: CORES.muted }]}
-  onPress={async () => {
-    if (!usuario) return;
-    try {
-      await axios.post(`${API_URL}/desejos`, {
-        usuarioId: usuario.id,
-        livroId: livroSelecionado?.id,
-      });
-      Alert.alert('Fila de espera', 'Você foi adicionado à lista de desejos! Será avisado quando disponível.');
-      await carregarDados();
-    } catch {
-      Alert.alert('Aviso', 'Você já está na lista de desejos para este livro.');
-    }
-  }}>
-  <Text style={s.btnDetalheReservaText}>🔔 Entrar na fila de espera</Text>
-</TouchableOpacity>
-          )}
-          <TouchableOpacity
-          style={[s.btnSecundario, { marginTop: 8 }]}
-          onPress={() => setMarleneAberta(true)}>
-          <Text style={s.btnSecundarioText}>📚 Perguntar para a Marlene</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.btnDetalheVoltar} onPress={() => setLivroSelecionado(null)}>
-            <Text style={s.btnDetalheVoltarText}>Voltar ao acervo</Text>
-          </TouchableOpacity>
-        </View>
-
-        {(() => {
-          const avLivro = todasAvaliacoes.filter(a => a.livroId === livroSelecionado?.id);
-          if (avLivro.length === 0) return null;
-          const media = (avLivro.reduce((s, a) => s + a.nota, 0) / avLivro.length).toFixed(1);
-          return (
-            <View style={{ marginTop: 24 }}>
-              <Text style={s.sectionLabel}>AVALIAÇÕES DA COMUNIDADE</Text>
-              <View style={s.avaliacaoMediaRow}>
-                <Text style={s.avaliacaoMediaNum}>{media}</Text>
-                <View>
-                  <View style={{ flexDirection: 'row', gap: 3 }}>
-                    {[1,2,3,4,5].map(i => (
-                      <Text key={i} style={{ fontSize: 18, color: i <= Math.round(Number(media)) ? CORES.amber : CORES.border }}>★</Text>
-                    ))}
-                  </View>
-                  <Text style={[s.loanAuthor, { marginTop: 4 }]}>{avLivro.length} avaliação(ões)</Text>
-                </View>
-              </View>
-              {avLivro.map(av => (
-                <View key={av.id} style={s.avaliacaoCard}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={s.avaliacaoNome}>{av.usuarioNome}</Text>
-                    <View style={{ flexDirection: 'row', gap: 2 }}>
-                      {[1,2,3,4,5].map(i => (
-                        <Text key={i} style={{ fontSize: 13, color: i <= av.nota ? CORES.amber : CORES.border }}>★</Text>
-                      ))}
-                    </View>
-                  </View>
-                  {av.resenha ? <Text style={s.resenhaTexto}>"{av.resenha}"</Text> : null}
-                  <Text style={[s.loanAuthor, { marginTop: 6 }]}>
-                    {new Date(av.criadoEm).toLocaleDateString('pt-BR')}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          );
-        })()}
-      </View>
-      {marleneAberta && livroSelecionado && (
-  <MarleneChat
-    livro={livroSelecionado}
-    acervo={livros}
-    onFechar={() => setMarleneAberta(false)}
-  />
-)}
-    </ScrollView>
-    );
-  }
-
-  const renderHome = () => (
-    <ScrollView style={{ flex: 1 }}>
-      <View style={s.homeHeader}>
-        <View>
-          <Text style={s.homeGreeting}>{saudacaoPorHorario} 👋</Text>
-          <Text style={s.homeName}>{usuario?.nome}</Text>
-        </View>
-        <View style={s.homeAvatarSmall}>
-          <Text style={s.homeAvatarText}>{usuario?.iniciais}</Text>
-        </View>
-      </View>
-      <View style={{ padding: 16, gap: 12 }}>
-        <View style={s.searchBar}>
-          <Text style={{ fontSize: 14, marginRight: 6 }}>🔍</Text>
-          <Text style={s.searchPlaceholder}>Buscar livros, autores...</Text>
-        </View>
-        <TouchableOpacity style={s.btnSecundario} onPress={() => carregarDados()}>
-          <Text style={s.btnSecundarioText}>↻  Atualizar acervo</Text>
-        </TouchableOpacity>
-        {erroConexao && (
-          <View style={[s.emptyBox, { borderColor: CORES.rust, borderWidth: 1, marginBottom: 8 }]}>
-            <Text style={[s.emptyText, { color: CORES.rust }]}>⚠️  Sem conexão com o servidor.{`\n`}Verifique o Wi-Fi e toque em Atualizar acervo.</Text>
-          </View>
-        )}
-        {carregando ? <ActivityIndicator color={CORES.amber} size="large" style={{ marginTop: 40 }} /> : (
-          <>
-            {emprestimosAtivos.length > 0 && (
-              <>
-                <Text style={s.sectionLabel}>MEU EMPRÉSTIMO ATIVO</Text>
-                {emprestimosAtivos.slice(0, 1).map(emp => {
-                  const livroDoEmprestimo = livros.find(livro => livro.id === emp.livroId);
-                  const tituloLivro = emp.livroTitulo || livroDoEmprestimo?.titulo || `Livro #${emp.livroId}`;
-
-                  return (
-                    <View key={emp.id} style={s.loanCard}>
-                      <View style={[s.loanCover, { backgroundColor: CORES.sage }]} />
-                      <View style={s.loanInfo}>
-                        <Text style={s.loanTitle}>{tituloLivro}</Text>
-                        <Text style={s.loanAuthor}>Status: {emp.status}</Text>
-                        <View style={s.progressBar}>
-                       <View style={[s.progressFill, { width: `${calcularProgresso(emp)}%` }]} />
-                      </View>
-                      </View>
-                    </View>
-                  );
-                })}
-              </>
-            )}
-            <Text style={s.sectionLabel}>ACERVO DISPONÍVEL</Text>
-            {livros.length === 0 ? (
-              <View style={s.emptyBox}>
-                <Text style={s.emptyText}>Nenhum livro no acervo ainda</Text>
-              </View>
-            ) : livros.map(livro => (
-              <TouchableOpacity key={livro.id} style={s.loanCard} onPress={() => setLivroSelecionado(livro)}>
-                <View style={[s.loanCover, { backgroundColor: CORES.ink }]} />
-                <View style={s.loanInfo}>
-                  <Text style={s.loanTitle}>{livro.titulo}</Text>
-                  <Text style={s.loanAuthor}>{livro.autor}</Text>
-                  <View style={[s.badgeSmall, { backgroundColor: livro.disponiveis > 0 ? 'rgba(74,124,89,0.12)' : 'rgba(184,76,46,0.12)' }]}>
-                    <Text style={[s.badgeText, { color: livro.disponiveis > 0 ? CORES.sage : CORES.rust }]}>
-                      {livro.disponiveis > 0 ? `✓ ${livro.disponiveis} disponível(is)` : '✗ Indisponível'}
-                    </Text>
-                  </View>
-                </View>
-                <Text style={{ color: CORES.muted, fontSize: 20 }}>›</Text>
-              </TouchableOpacity>
-            ))}
-          </>
-        )}
-      </View>
-    </ScrollView>
-  );
-
-  function renderBusca() {
-    return (
-    <ScrollView style={{ flex: 1 }}>
-      <View style={s.homeHeader}>
-        <View>
-          <Text style={s.homeGreeting}>Explorar acervo</Text>
-          <Text style={s.homeName}>{livrosFiltrados.length} livros</Text>
-        </View>
-      </View>
-      <View style={{ padding: 16 }}>
-        <TouchableOpacity style={[s.btnSecundario, { marginBottom: 10 }]} onPress={() => carregarDados()}>
-          <Text style={s.btnSecundarioText}>Atualizar acervo</Text>
-        </TouchableOpacity>
-        <TextInput style={[s.input, { marginBottom: 12 }]}
-          placeholder="🔍  Buscar por título ou autor..."
-          placeholderTextColor={CORES.muted}
-          value={buscaTexto} onChangeText={setBuscaTexto} />
-        <Text style={s.sectionLabel}>DISPONIBILIDADE</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            {[
-              { key: 'todos', label: 'Todos' },
-              { key: 'disponivel', label: '✓ Disponível' },
-              { key: 'indisponivel', label: '✗ Indisponível' },
-            ].map(f => (
-              <TouchableOpacity key={f.key}
-                style={[s.filtroBtn, filtroDisp === f.key && s.filtroBtnAtivo]}
-                onPress={() => setFiltroDisp(f.key)}>
-                <Text style={[s.filtroText, filtroDisp === f.key && s.filtroTextAtivo]}>{f.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </ScrollView>
-        <Text style={s.sectionLabel}>GÊNERO</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            {generosUnicos.map(g => (
-              <TouchableOpacity key={g}
-                style={[s.filtroBtn, filtroGenero === g && s.filtroBtnAtivo]}
-                onPress={() => setFiltroGenero(g)}>
-                <Text style={[s.filtroText, filtroGenero === g && s.filtroTextAtivo]}>
-                  {g === 'todos' ? 'Todos' : g}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </ScrollView>
-        {carregando ? (
-          <ActivityIndicator color={CORES.amber} size="large" style={{ marginTop: 40 }} />
-        ) : livrosFiltrados.length === 0 ? (
-          <View style={s.emptyBox}>
-            <Text style={s.emptyText}>Nenhum livro encontrado{'\n'}Tente outros filtros</Text>
-          </View>
-        ) : livrosFiltrados.map(livro => (
-          <TouchableOpacity key={livro.id} style={s.loanCard} onPress={() => setLivroSelecionado(livro)}>
-            <View style={[s.loanCover, { backgroundColor: CORES.ink }]} />
-            <View style={s.loanInfo}>
-              <Text style={s.loanTitle}>{livro.titulo}</Text>
-              <Text style={s.loanAuthor}>{livro.autor}</Text>
-              {livro.genero ? <Text style={[s.loanAuthor, { color: CORES.amber }]}>{livro.genero}</Text> : null}
-              <View style={[s.badgeSmall, { backgroundColor: livro.disponiveis > 0 ? 'rgba(74,124,89,0.12)' : 'rgba(184,76,46,0.12)' }]}>
-                <Text style={[s.badgeText, { color: livro.disponiveis > 0 ? CORES.sage : CORES.rust }]}>
-                  {livro.disponiveis > 0 ? `✓ ${livro.disponiveis} disponível(is)` : '✗ Indisponível'}
-                </Text>
-              </View>
-            </View>
-            <View style={{ alignItems: 'center', gap: 2 }}>
-              <TouchableOpacity
-                onPress={() => handleToggleDesejo(livro)}
-                disabled={togglendoDesejo === livro.id}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Text style={{ fontSize: 20, opacity: togglendoDesejo === livro.id ? 0.4 : 1 }}>
-                  {desejos.find(d => d.livroId === livro.id) ? '❤️' : '🤍'}
-                </Text>
-              </TouchableOpacity>
-              <Text style={{ color: CORES.muted, fontSize: 20 }}>›</Text>
-            </View>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </ScrollView>
-    );
-  }
-
-  const renderEscreverResenha = () => {
-    const livroObj = livros.find(l => l.id === livroParaResenhar?.livroId);
-    const minhaAvaliacao = todasAvaliacoes.find(
-      a => a.usuarioId === usuario?.id && a.livroId === livroParaResenhar?.livroId
-    );
-    const fecharResenha = () => {
-      setTelaResenha(false);
-      setLivroParaResenhar(null);
-      setNotaResenha(0);
-      setTextoResenha('');
-    };
-    return (
+  if (tela === 'professor') {
+    const renderHomeProfessor = () => (
       <ScrollView style={{ flex: 1 }}>
         <View style={s.homeHeader}>
-          <TouchableOpacity onPress={fecharResenha} style={{ marginRight: 12 }}>
-            <Text style={{ color: CORES.amberLt, fontSize: 16, fontWeight: '700' }}>← Voltar</Text>
-          </TouchableOpacity>
-          <Text style={s.homeGreeting}>Avaliação de livro</Text>
-        </View>
-        <View style={{ padding: 20 }}>
-          <View style={s.detalheCard}>
-            {livroObj?.capa ? (
-              <Image source={{ uri: livroObj.capa }} style={s.detalheCover} resizeMode="cover" />
-            ) : (
-              <View style={[s.detalheCover, { backgroundColor: CORES.muted }]} />
-            )}
-            <View style={{ flex: 1 }}>
-              <Text style={s.detalheTitulo}>{livroParaResenhar?.livroTitulo}</Text>
-              <Text style={s.detalheAutor}>{livroParaResenhar?.livroAutor || '—'}</Text>
-              {livroParaResenhar?.dataDevolucao ? (
-                <Text style={[s.loanAuthor, { marginTop: 6 }]}>
-                  Devolvido em {new Date(livroParaResenhar.dataDevolucao).toLocaleDateString('pt-BR')}
-                </Text>
-              ) : null}
-            </View>
+          <View>
+            <Text style={s.homeGreeting}>{saudacaoPorHorario}, Professor(a) 👋</Text>
+            <Text style={s.homeName}>{usuario?.nome}</Text>
           </View>
-
-          {minhaAvaliacao ? (
-            <View style={s.resenhaJaCard}>
-              <Text style={s.sectionLabel}>SUA AVALIAÇÃO</Text>
-              <View style={{ flexDirection: 'row', gap: 4, marginVertical: 10 }}>
-                {[1,2,3,4,5].map(i => (
-                  <Text key={i} style={{ fontSize: 30, color: i <= minhaAvaliacao.nota ? CORES.amber : CORES.border }}>★</Text>
-                ))}
-              </View>
-              {minhaAvaliacao.resenha ? (
-                <Text style={s.resenhaTexto}>"{minhaAvaliacao.resenha}"</Text>
-              ) : null}
-              <Text style={[s.loanAuthor, { marginTop: 8 }]}>
-                Enviado em {new Date(minhaAvaliacao.criadoEm).toLocaleDateString('pt-BR')}
-              </Text>
-            </View>
-          ) : (
+          <View style={s.homeAvatarSmall}>
+            <Text style={s.homeAvatarText}>{usuario?.iniciais}</Text>
+          </View>
+        </View>
+        <View style={{ padding: 16, gap: 12 }}>
+          <View style={s.searchBar}>
+            <Text style={{ fontSize: 14, marginRight: 6 }}>🔍</Text>
+            <Text style={s.searchPlaceholder}>Buscar livros, autores...</Text>
+          </View>
+          {carregando ? <ActivityIndicator color={CORES.amber} size="large" style={{ marginTop: 40 }} /> : (
             <>
-              <Text style={s.sectionLabel}>SUA NOTA *</Text>
-              <View style={{ flexDirection: 'row', gap: 6, marginBottom: 20, justifyContent: 'center' }}>
-                {[1,2,3,4,5].map(i => (
-                  <TouchableOpacity key={i} onPress={() => setNotaResenha(i)}>
-                    <Text style={{ fontSize: 42, color: i <= notaResenha ? CORES.amber : CORES.border }}>★</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              <Text style={s.sectionLabel}>RESENHA (OPCIONAL)</Text>
-              <TextInput
-                style={[s.input, { height: 120, textAlignVertical: 'top', paddingTop: 12 }]}
-                placeholder="Conte o que achou do livro, personagens, história..."
-                placeholderTextColor={CORES.muted}
-                value={textoResenha}
-                onChangeText={setTextoResenha}
-                multiline
-                maxLength={1000}
-              />
-              <Text style={[s.loanAuthor, { textAlign: 'right', marginTop: 4 }]}>{textoResenha.length}/1000</Text>
-              <TouchableOpacity
-                style={[s.btnDetalheReserva, { marginTop: 16, opacity: enviandoResenha ? 0.7 : 1 }]}
-                onPress={handleEnviarResenha}
-                disabled={enviandoResenha}>
-                {enviandoResenha
-                  ? <ActivityIndicator color={CORES.ink} />
-                  : <Text style={s.btnDetalheReservaText}>⭐ Enviar avaliação</Text>}
-              </TouchableOpacity>
+              {emprestimosAtivos.length > 0 && (
+                <>
+                  <Text style={s.sectionLabel}>MEUS EMPRÉSTIMOS ATIVOS</Text>
+                  {emprestimosAtivos
+                    .filter(emp => emp.usuarioId === usuario?.id)
+                    .slice(0, 2).map(emp => (
+                    <View key={emp.id} style={s.loanCard}>
+                      {emp.livroTitulo && emp.capa ? (
+                        <Image source={{ uri: emp.capa }} style={s.loanCover} resizeMode="cover" />
+                      ) : (
+                        <View style={[s.loanCover, { backgroundColor: CORES.sage }]} />
+                      )}
+                      <View style={s.loanInfo}>
+                        <Text style={s.loanTitle}>{emp.livroTitulo || `Livro #${emp.livroId}`}</Text>
+                        <Text style={s.loanAuthor}>{emp.livroAutor || '—'}</Text>
+                        <View style={[s.badgeSmall, { backgroundColor: 'rgba(201,123,46,0.12)', marginTop: 6 }]}>
+                          <Text style={[s.badgeText, { color: CORES.amber }]}>{emp.status}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  ))}
+                </>
+              )}
+              <Text style={s.sectionLabel}>ACERVO DISPONÍVEL</Text>
+              {livros.length === 0 ? (
+                <View style={s.emptyBox}>
+                  <Text style={s.emptyText}>Nenhum livro no acervo ainda</Text>
+                </View>
+              ) : livros.slice(0, 5).map(livro => (
+                <TouchableOpacity key={livro.id} style={s.loanCard} onPress={() => setLivroSelecionado(livro)}>
+                  {livro.capa ? (
+                    <Image source={{ uri: livro.capa }} style={s.loanCover} resizeMode="cover" />
+                  ) : (
+                    <View style={[s.loanCover, { backgroundColor: CORES.ink }]} />
+                  )}
+                  <View style={s.loanInfo}>
+                    <Text style={s.loanTitle}>{livro.titulo}</Text>
+                    <Text style={s.loanAuthor}>{livro.autor}</Text>
+                    <View style={[s.badgeSmall, { backgroundColor: livro.disponiveis > 0 ? 'rgba(74,124,89,0.12)' : 'rgba(184,76,46,0.12)' }]}>
+                      <Text style={[s.badgeText, { color: livro.disponiveis > 0 ? CORES.sage : CORES.rust }]}>
+                        {livro.disponiveis > 0 ? `✓ ${livro.disponiveis} disponível(is)` : '✗ Indisponível'}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={{ color: CORES.muted, fontSize: 20 }}>›</Text>
+                </TouchableOpacity>
+              ))}
             </>
           )}
         </View>
       </ScrollView>
     );
-  };
 
-  const renderQrRetirada = () => {
-    const payload = dadosQrRetirada?.payload || '';
-    const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(payload)}`;
-    const expiraEm = dadosQrRetirada?.expiraEm
-      ? new Date(dadosQrRetirada.expiraEm).toLocaleString('pt-BR')
-      : '---';
-
-    return (
+    const renderTurmaProfessor = () => (
       <ScrollView style={{ flex: 1 }}>
         <View style={s.homeHeader}>
-          <TouchableOpacity onPress={() => setTelaQrRetirada(false)} style={{ marginRight: 12 }}>
-            <Text style={{ color: CORES.amberLt, fontSize: 16, fontWeight: '700' }}>← Voltar</Text>
-          </TouchableOpacity>
-          <Text style={[s.homeGreeting, { flex: 1 }]}>QR para retirada física</Text>
+          <View>
+            <Text style={s.homeGreeting}>Empréstimos da turma</Text>
+            <Text style={s.homeName}>{emprestimosAtivos.length} ativos</Text>
+          </View>
         </View>
         <View style={{ padding: 16 }}>
-          <View style={s.qrCard}>
-            <Text style={s.qrTitle}>{emprestimoQrAtual?.livroTitulo || 'Empréstimo selecionado'}</Text>
-            <Text style={s.qrSub}>Mostre este QR no balcão da biblioteca</Text>
-            {payload ? (
-              <Image source={{ uri: qrImageUrl }} style={s.qrImage} resizeMode="contain" />
-            ) : null}
-            <Text style={s.qrCodeText}>{dadosQrRetirada?.codigo || '---'}</Text>
-            <Text style={s.qrExpireText}>Válido até: {expiraEm}</Text>
-          </View>
+          <Text style={s.sectionLabel}>TODOS OS EMPRÉSTIMOS ATIVOS</Text>
+          {carregando ? (
+            <ActivityIndicator color={CORES.amber} size="large" style={{ marginTop: 40 }} />
+          ) : emprestimosAtivos.length === 0 ? (
+            <View style={s.emptyBox}>
+              <Text style={s.emptyText}>Nenhum empréstimo ativo no momento</Text>
+            </View>
+          ) : emprestimosAtivos.map(emp => (
+            <View key={emp.id} style={s.loanCard}>
+              {emp.capa ? (
+                <Image source={{ uri: emp.capa }} style={s.loanCover} resizeMode="cover" />
+              ) : (
+                <View style={[s.loanCover, { backgroundColor: CORES.sage }]} />
+              )}
+              <View style={s.loanInfo}>
+                <Text style={s.loanTitle}>{emp.livroTitulo || `Livro #${emp.livroId}`}</Text>
+                <Text style={s.loanAuthor}>{emp.livroAutor || '—'}</Text>
+                <Text style={[s.loanAuthor, { color: CORES.amber, marginTop: 2 }]}>
+                  👤 {emp.usuarioNome || `Aluno #${emp.usuarioId}`}
+                  {emp.usuarioTurma ? ` · Turma ${emp.usuarioTurma}` : ''}
+                </Text>
+                <View style={[s.badgeSmall, { backgroundColor: 'rgba(201,123,46,0.12)', marginTop: 6 }]}>
+                  <Text style={[s.badgeText, { color: CORES.amber }]}>{emp.status}</Text>
+                </View>
+              </View>
+            </View>
+          ))}
         </View>
       </ScrollView>
     );
-  };
 
-  const renderListaDesejos = () => (
-    <ScrollView style={{ flex: 1 }}>
-      <View style={s.homeHeader}>
-        <TouchableOpacity onPress={() => setTelaListaDesejos(false)} style={{ marginRight: 12 }}>
-          <Text style={{ color: CORES.amberLt, fontSize: 16, fontWeight: '700' }}>← Voltar</Text>
-        </TouchableOpacity>
-        <View style={{ flex: 1 }}>
-          <Text style={s.homeGreeting}>Lista de Desejos</Text>
-          <Text style={s.homeName}>{desejos.length} título(s)</Text>
-        </View>
-      </View>
-      <View style={{ padding: 16 }}>
-        {desejos.length === 0 ? (
-          <View style={s.emptyBox}>
-            <Text style={{ fontSize: 40, textAlign: 'center', marginBottom: 12 }}>🤍</Text>
-            <Text style={s.emptyText}>
-              Sua lista de desejos está vazia.{'\n'}
-              Toque em 🤍 em qualquer livro para salvar.
-            </Text>
-          </View>
-        ) : desejos.map(d => {
-          const livroAtual = livros.find(l => l.id === d.livroId);
-          const disp = livroAtual?.disponiveis ?? 0;
-          return (
-            <View key={d.id} style={s.loanCard}>
-              {d.livroCapa ? (
-                <Image source={{ uri: d.livroCapa }} style={s.loanCover} resizeMode="cover" />
-              ) : (
-                <View style={[s.loanCover, { backgroundColor: CORES.ink }]} />
-              )}
-              <View style={s.loanInfo}>
-                <Text style={s.loanTitle}>{d.livroTitulo}</Text>
-                <Text style={s.loanAuthor}>{d.livroAutor || '—'}</Text>
-                {d.livroGenero ? (
-                  <Text style={[s.loanAuthor, { color: CORES.amber }]}>{d.livroGenero}</Text>
-                ) : null}
-                <View style={[s.badgeSmall, { backgroundColor: disp > 0 ? 'rgba(74,124,89,0.12)' : 'rgba(184,76,46,0.12)', marginTop: 6 }]}>
-                  <Text style={[s.badgeText, { color: disp > 0 ? CORES.sage : CORES.rust }]}>
-                    {disp > 0 ? `✓ Disponível` : '✗ Indisponível'}
-                  </Text>
-                </View>
-              </View>
-              <View style={{ gap: 8, alignItems: 'center' }}>
-                {disp > 0 && livroAtual ? (
-                  <TouchableOpacity
-                    style={[s.btnAmber, { paddingHorizontal: 10 }]}
-                    onPress={() => {
-                      setTelaListaDesejos(false);
-                      setAbaAtiva('buscar');
-                      setLivroSelecionado(livroAtual);
-                    }}>
-                    <Text style={s.btnAmberText}>Reservar</Text>
-                  </TouchableOpacity>
-                ) : null}
-                <TouchableOpacity
-                  onPress={() => handleToggleDesejo({ id: d.livroId })}
-                  disabled={togglendoDesejo === d.livroId}
-                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                  <Text style={{ fontSize: 20, opacity: togglendoDesejo === d.livroId ? 0.4 : 1 }}>❤️</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          );
-        })}
-      </View>
-    </ScrollView>
-  );
-
-  const renderPerfil = () => {
-    const avaliacoesAluno = todasAvaliacoes.filter(a => a.usuarioId === usuario?.id);
-    const livrosConcluidos = historico.length;
-    const metasLeitura = [
-      {
-        id: 'meta-1',
-        icon: '🌱',
-        nome: 'Primeiros Passos',
-        descricao: 'Concluir 1 leitura',
-        progresso: livrosConcluidos,
-        meta: 1,
-      },
-      {
-        id: 'meta-2',
-        icon: '📖',
-        nome: 'Leitor Dedicado',
-        descricao: 'Concluir 5 leituras',
-        progresso: livrosConcluidos,
-        meta: 5,
-      },
-      {
-        id: 'meta-3',
-        icon: '🏆',
-        nome: 'Mestre da Biblioteca',
-        descricao: 'Concluir 10 leituras',
-        progresso: livrosConcluidos,
-        meta: 10,
-      },
-      {
-        id: 'meta-4',
-        icon: '⭐',
-        nome: 'Crítico Literário',
-        descricao: 'Enviar 3 avaliações',
-        progresso: avaliacoesAluno.length,
-        meta: 3,
-      },
-      {
-        id: 'meta-5',
-        icon: '💡',
-        nome: 'Explorador de Títulos',
-        descricao: 'Salvar 5 livros na lista de desejos',
-        progresso: desejos.length,
-        meta: 5,
-      },
-    ];
-
-    return (
+    const renderPerfilProfessor = () => (
       <ScrollView style={{ flex: 1 }}>
         <View style={s.perfilTop}>
           <View style={s.perfilAvatar}>
             <Text style={s.perfilAvatarText}>{usuario?.iniciais}</Text>
           </View>
           <Text style={s.perfilName}>{usuario?.nome}</Text>
-          <Text style={s.perfilSub}>Turma {usuario?.turma} · {usuario?.email}</Text>
-          <View style={s.perfilStats}>
-            {[
-              { num: historico.length + emprestimosAtivos.length, label: 'Lidos' },
-              { num: emprestimosAtivos.length, label: 'Ativos' },
-              { num: desejos.length, label: 'Desejos' },
-            ].map((st, i) => (
-              <View key={i} style={s.perfilStat}>
-                <Text style={s.perfilStatNum}>{st.num}</Text>
-                <Text style={s.perfilStatLabel}>{st.label}</Text>
-              </View>
-            ))}
+          <Text style={s.perfilSub}>{usuario?.email}</Text>
+          <View style={s.perfilBadge}>
+            <Text style={s.perfilBadgeTitle}>{BIBLIOTECA}</Text>
+            <Text style={s.perfilBadgeSub}>{ESCOLA}</Text>
           </View>
         </View>
         <View style={{ padding: 16 }}>
+          <View style={s.statsRow}>
+            {[
+              { num: emprestimosAtivos.filter(e => e.usuarioId === usuario?.id).length, label: 'Meus\nempréstimos' },
+              { num: historico.filter(h => h.usuarioId === usuario?.id).length, label: 'Total\nlidos' },
+              { num: emprestimosAtivos.length, label: 'Ativos\nna escola' },
+            ].map((st, i) => (
+              <View key={i} style={s.statCard}>
+                <Text style={s.statNum}>{st.num}</Text>
+                <Text style={s.statLabel}>{st.label}</Text>
+              </View>
+            ))}
+          </View>
           {[
-            { icon: '📚', title: 'Histórico de Empréstimos', sub: `${historico.length} livros lidos` },
-            { icon: '🤍', title: 'Minha Lista de Desejos', sub: `${desejos.length} título(s) salvos` },
+            { icon: '📚', title: 'Meu histórico', sub: `${historico.filter(h => h.usuarioId === usuario?.id).length} livros lidos` },
             { icon: '🔔', title: 'Notificações', sub: 'Configurar alertas' },
             { icon: '✏️', title: 'Editar perfil', sub: 'Atualizar informações' },
           ].map((item, i) => (
-            <TouchableOpacity key={i} style={s.menuItem}
-              onPress={i === 1 ? () => setTelaListaDesejos(true) : undefined}>
+            <TouchableOpacity key={i} style={s.menuItem}>
               <View style={s.menuIcon}><Text style={{ fontSize: 18 }}>{item.icon}</Text></View>
               <View style={{ flex: 1 }}>
                 <Text style={s.menuTitle}>{item.title}</Text>
@@ -2396,66 +2407,77 @@ if (tela === 'professor') {
               <Text style={s.menuArrow}>›</Text>
             </TouchableOpacity>
           ))}
-
-          <Text style={[s.sectionLabel, { marginTop: 20 }]}>SELOS DE LEITURA</Text>
-          <View style={s.selosGrid}>
-            {metasLeitura.map(selo => {
-              const desbloqueado = selo.progresso >= selo.meta;
-              const percentual = Math.min(100, Math.round((selo.progresso / selo.meta) * 100));
-              return (
-                <View key={selo.id} style={[s.seloCard, !desbloqueado && s.seloCardLocked]}>
-                  <View style={s.seloHeader}>
-                    <Text style={s.seloIcon}>{selo.icon}</Text>
-                    <View style={[s.badgeSmall, { marginTop: 0, backgroundColor: desbloqueado ? 'rgba(74,124,89,0.15)' : 'rgba(138,125,104,0.15)' }]}>
-                      <Text style={[s.badgeText, { color: desbloqueado ? CORES.sage : CORES.muted }]}>
-                        {desbloqueado ? 'Desbloqueado' : `${percentual}%`}
-                      </Text>
-                    </View>
-                  </View>
-                  <Text style={s.seloTitulo}>{selo.nome}</Text>
-                  <Text style={s.seloDesc}>{selo.descricao}</Text>
-                  <View style={s.seloBarraBg}>
-                    <View style={[s.seloBarraFill, { width: `${percentual}%` }]} />
-                  </View>
-                  <Text style={s.seloMeta}>{Math.min(selo.progresso, selo.meta)}/{selo.meta}</Text>
-                </View>
-              );
-            })}
-          </View>
-
           <TouchableOpacity style={s.logoutBtn} onPress={handleLogout}>
             <Text style={s.logoutText}>Sair da conta</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
     );
-  };
 
-const abas = [
-  { key: 'home', icon: '🏠', label: 'Início' },
-  { key: 'buscar', icon: '🔍', label: 'Explorar' },
-  { key: 'livros', icon: '📋', label: 'Reservas' },
-  { key: 'avisos', icon: '🔔', label: 'Avisos' },
-  { key: 'perfil', icon: '👤', label: 'Perfil' },
-];
+    const abasProfessor = [
+      { key: 'home', icon: '🏠', label: 'Início' },
+      { key: 'buscar', icon: '🔍', label: 'Explorar' },
+      { key: 'turma', icon: '👥', label: 'Turma' },
+      { key: 'perfil', icon: '👤', label: 'Perfil' },
+    ];
+
+    return (
+      <SafeAreaView style={s.container}>
+        <View style={{ flex: 1 }}>
+          {abaProfessor === 'home' && !livroSelecionado && renderHomeProfessor()}
+          {abaProfessor === 'home' && livroSelecionado && renderDetalhe()}
+          {abaProfessor === 'buscar' && !livroSelecionado && renderBusca()}
+          {abaProfessor === 'buscar' && livroSelecionado && renderDetalhe()}
+          {abaProfessor === 'turma' && renderTurmaProfessor()}
+          {abaProfessor === 'perfil' && renderPerfilProfessor()}
+        </View>
+        <View style={s.tabBar}>
+          {abasProfessor.map(aba => (
+            <TouchableOpacity key={aba.key} style={s.tabItem}
+              onPress={() => { setAbaProfessor(aba.key as AbaProfessor); setLivroSelecionado(null); }}>
+              <Text style={{ fontSize: 20 }}>{aba.icon}</Text>
+              <Text style={[s.tabLabel, abaProfessor === aba.key && { color: CORES.amber, fontWeight: '600' }]}>
+                {aba.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ── TELA DO ALUNO ──
+  const abas = [
+    { key: 'home',   icon: '🏠', label: 'Início'   },
+    { key: 'buscar', icon: '🔍', label: 'Explorar' },
+    { key: 'livros', icon: '📋', label: 'Reservas' },
+    { key: 'avisos', icon: '🔔', label: 'Avisos'   },
+    { key: 'perfil', icon: '👤', label: 'Perfil'   },
+  ];
 
   return (
     <SafeAreaView style={s.container}>
       <View style={{ flex: 1 }}>
-        {abaAtiva === 'home' && !livroSelecionado && renderHome()}
-        {abaAtiva === 'home' && livroSelecionado && renderDetalhe()}
+        {abaAtiva === 'home'   && !livroSelecionado && renderHome()}
+        {abaAtiva === 'home'   &&  livroSelecionado && renderDetalhe()}
         {abaAtiva === 'buscar' && !livroSelecionado && renderBusca()}
-        {abaAtiva === 'buscar' && livroSelecionado && renderDetalhe()}
-        {abaAtiva === 'livros' && telaQrRetirada && renderQrRetirada()}
+        {abaAtiva === 'buscar' &&  livroSelecionado && renderDetalhe()}
+        {abaAtiva === 'livros' &&  telaQrRetirada   && renderQrRetirada()}
         {abaAtiva === 'livros' && !telaQrRetirada && !telaResenha && renderMeusLivros()}
-        {abaAtiva === 'livros' && !telaQrRetirada && telaResenha && renderEscreverResenha()}
-        {abaAtiva === 'perfil' && telaListaDesejos && renderListaDesejos()}
+        {abaAtiva === 'livros' && !telaQrRetirada &&  telaResenha && renderEscreverResenha()}
+        {abaAtiva === 'perfil' &&  telaListaDesejos && renderListaDesejos()}
         {abaAtiva === 'perfil' && !telaListaDesejos && renderPerfil()}
         {abaAtiva === 'avisos' && renderNotificacoes()}
       </View>
       <View style={s.tabBar}>
         {abas.map(aba => (
-          <TouchableOpacity key={aba.key} style={s.tabItem} onPress={() => { setAbaAtiva(aba.key as AbaUsuario); setLivroSelecionado(null); setTelaListaDesejos(false); setTelaQrRetirada(false); }}>
+          <TouchableOpacity key={aba.key} style={s.tabItem}
+            onPress={() => {
+              setAbaAtiva(aba.key as AbaUsuario);
+              setLivroSelecionado(null);
+              setTelaListaDesejos(false);
+              setTelaQrRetirada(false);
+            }}>
             <Text style={{ fontSize: 20 }}>{aba.icon}</Text>
             <Text style={[s.tabLabel, abaAtiva === aba.key && { color: CORES.amber, fontWeight: '600' }]}>
               {aba.label}

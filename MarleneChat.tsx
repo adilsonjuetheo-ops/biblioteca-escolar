@@ -10,9 +10,8 @@ const CORES = {
   rust: '#b84c2e', muted: '#8a7d68', card: '#fdfaf4', border: '#d9cfbe',
 };
 
-const API_URL = 'https://api.anthropic.com/v1/messages';
-const MODEL = 'claude-sonnet-4-20250514';
-const ANTHROPIC_KEY = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY || '';
+// ← aponta para sua própria API, não para a Anthropic diretamente
+const API_URL = 'https://bibliotecaapi-production-7ee0.up.railway.app/api/marlene';
 
 type Livro = {
   id: string; titulo: string; autor?: string; genero?: string;
@@ -25,6 +24,7 @@ function buildSystemPrompt(livro: Livro, acervo: Livro[]): string {
   const acervoResumido = acervo.slice(0, 30).map(l =>
     `- "${l.titulo}"${l.autor ? ` de ${l.autor}` : ''}${l.genero ? ` (${l.genero})` : ''}${(l.disponiveis ?? 0) > 0 ? ' ✓ disponível' : ' ✗ indisponível'}`
   ).join('\n');
+
   return `Você é a Marlene, a assistente virtual da Biblioteca Marlene de Souza Queiroz da E. E. Cel. José Venâncio de Souza.
 
 Sua personalidade:
@@ -55,6 +55,7 @@ Disponibilidade: ${(livro.disponiveis ?? 0) > 0 ? `${livro.disponiveis} exemplar
 Acervo da biblioteca:
 ${acervoResumido || 'Acervo não disponível.'}`;
 }
+
 export default function MarleneChat({ livro, acervo = [], onFechar }: Props) {
   const [mensagens, setMensagens] = useState<Mensagem[]>([
     {
@@ -82,38 +83,38 @@ export default function MarleneChat({ livro, acervo = [], onFechar }: Props) {
   async function enviarMensagem() {
     const texto = input.trim();
     if (!texto || carregando) return;
+
     const novasMensagens: Mensagem[] = [...mensagens, { role: 'user', content: texto }];
     setMensagens(novasMensagens);
     setInput('');
     setCarregando(true);
-  try {
-  const response = await fetch(API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': ANTHROPIC_KEY || '',
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 1024,
-      system: buildSystemPrompt(livro, acervo),
-      messages: novasMensagens.map(m => ({ role: m.role, content: m.content })),
-    }),
-  });
-  const data = await response.json();
-  const resposta = data?.content?.[0]?.text || 'Desculpa, não consegui responder agora. Tenta de novo! 😅';
-  setMensagens(prev => [...prev, { role: 'assistant', content: resposta }]);
-} catch (err) {
-  console.log('ERRO:', String(err));
-  setMensagens(prev => [...prev, {
-    role: 'assistant',
-    content: 'Ops, tive um probleminha técnico! 😅 Tenta de novo em instantes.',
-  }]);
-} finally {
-  setCarregando(false);
-}
+
+    try {
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system: buildSystemPrompt(livro, acervo),
+          messages: novasMensagens.map(m => ({ role: m.role, content: m.content })),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      const resposta = data?.resposta || 'Desculpa, não consegui responder agora. Tenta de novo! 😅';
+      setMensagens(prev => [...prev, { role: 'assistant', content: resposta }]);
+    } catch (err) {
+      console.error('Erro Marlene:', err);
+      setMensagens(prev => [...prev, {
+        role: 'assistant',
+        content: 'Ops, tive um probleminha técnico! 😅 Tenta de novo em instantes.',
+      }]);
+    } finally {
+      setCarregando(false);
+    }
   }
 
   const sugestoes = [
@@ -217,6 +218,7 @@ export default function MarleneChat({ livro, acervo = [], onFechar }: Props) {
     </Animated.View>
   );
 }
+
 const s = StyleSheet.create({
   overlay: {
     position: 'absolute',
