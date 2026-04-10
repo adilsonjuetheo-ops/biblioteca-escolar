@@ -2101,6 +2101,38 @@ export default function App() {
                     </View>
                   ) : null}
                 </View>
+
+                {/* ── QUANTIDADE DE EXEMPLARES ── */}
+                <Text style={[s.label, { marginTop: 16 }]}>QUANTIDADE DE EXEMPLARES *</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+                  <TouchableOpacity
+                    style={[s.btnDetalheVoltar, { width: 44, height: 44, borderRadius: 22 }]}
+                    onPress={() => setLivroScaneado(prev => prev ? {
+                      ...prev,
+                      totalExemplares: Math.max(1, (prev.totalExemplares || 1) - 1)
+                    } : prev)}>
+                    <Text style={[s.btnDetalheVoltarText, { fontSize: 20 }]}>−</Text>
+                  </TouchableOpacity>
+                  <TextInput
+                    style={[s.input, { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '700', marginBottom: 0 }]}
+                    value={String(livroScaneado.totalExemplares || 1)}
+                    onChangeText={v => {
+                      const num = parseInt(v) || 1;
+                      setLivroScaneado(prev => prev ? { ...prev, totalExemplares: Math.max(1, num) } : prev);
+                    }}
+                    keyboardType="number-pad"
+                    maxLength={3}
+                  />
+                  <TouchableOpacity
+                    style={[s.btnAmber, { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }]}
+                    onPress={() => setLivroScaneado(prev => prev ? {
+                      ...prev,
+                      totalExemplares: (prev.totalExemplares || 1) + 1
+                    } : prev)}>
+                    <Text style={[s.btnAmberText, { fontSize: 20 }]}>+</Text>
+                  </TouchableOpacity>
+                </View>
+
                 <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
                   <TouchableOpacity
                     style={[s.btnDetalheVoltar, { flex: 1 }]}
