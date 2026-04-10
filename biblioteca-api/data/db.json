@@ -1,0 +1,251 @@
+{
+  "usuarios": [
+    {
+      "id": "1d113280-2224-4c34-bd93-ee8dfef33ac4",
+      "nome": "Usuario Teste",
+      "email": "teste.20260407184127@aluno.mg.gov.br",
+      "senhaHash": "$2a$10$li6./AfI.5wTz4QXoIy6xuDb8cEP8S4ucCShqbNa3.L2ObxtkTWq2",
+      "perfil": "aluno",
+      "matricula": "2026001",
+      "turma": "3A",
+      "criadoEm": "2026-04-07T21:41:28.315Z",
+      "atualizadoEm": "2026-04-07T21:41:28.857Z"
+    },
+    {
+      "id": "f1bcbacc-b30b-4838-abf6-854c4c0ed6d7",
+      "nome": "Usuario Teste",
+      "email": "teste.20260407184148@aluno.mg.gov.br",
+      "senhaHash": "$2a$10$jDm6L6gBpJM4paxRfCm4E..aFaPUSrBuVTW/XW0SdhHKtgqefviGm",
+      "perfil": "aluno",
+      "matricula": "2026001",
+      "turma": "3A",
+      "criadoEm": "2026-04-07T21:41:48.725Z",
+      "atualizadoEm": "2026-04-07T21:41:48.992Z"
+    },
+    {
+      "id": "06a1761e-83f8-4ab0-992a-d04bb01fc957",
+      "nome": "Adilson manoel",
+      "email": "adilson@aluno.mg.gov.br",
+      "senhaHash": "$2a$10$oTaI9zZfbP9GJs73XC6ku.P2w.z37zFvC10YwfBjO1ojEPlbXldUK",
+      "perfil": "aluno",
+      "matricula": "12345",
+      "turma": "3B",
+      "criadoEm": "2026-04-09T01:03:27.481Z"
+    }
+  ],
+  "livros": [
+    {
+      "id": "8095859d-5719-4f80-849c-0cafb14504df",
+      "titulo": "Dom Casmurro",
+      "autor": "Machado de Assis",
+      "genero": "Romance",
+      "capa": "",
+      "sinopse": "Clássico da literatura brasileira.",
+      "totalExemplares": 10,
+      "disponiveis": 8,
+      "criadoEm": "2026-04-09T01:09:37.058Z",
+      "atualizadoEm": "2026-04-09T01:20:07.292Z"
+    },
+    {
+      "id": "64a75111-9c0a-4c9f-8790-03a18cb092f5",
+      "titulo": "O Cravo e a Rosa",
+      "autor": "Walcyr Carrasco",
+      "genero": "Drama",
+      "capa": "",
+      "sinopse": "",
+      "totalExemplares": 10,
+      "disponiveis": 9,
+      "criadoEm": "2026-04-09T01:17:03.172Z",
+      "atualizadoEm": "2026-04-09T01:18:35.783Z"
+    },
+    {
+      "id": "1066a42f-d4a8-416f-8552-d2682232de3e",
+      "titulo": "Capitães da Areia",
+      "autor": "Jorge Amado",
+      "genero": "Romance",
+      "capa": "",
+      "sinopse": "",
+      "totalExemplares": 10,
+      "disponiveis": 9,
+      "criadoEm": "2026-04-09T01:17:03.180Z",
+      "atualizadoEm": "2026-04-09T01:31:26.968Z"
+    },
+    {
+      "id": "00ada16f-a6cf-4b4b-a1c7-33f45c167c69",
+      "titulo": "Vidas Secas",
+      "autor": "Graciliano Ramos",
+      "genero": "Romance",
+      "capa": "",
+      "sinopse": "",
+      "totalExemplares": 10,
+      "disponiveis": 10,
+      "criadoEm": "2026-04-09T01:17:03.187Z"
+    },
+    {
+      "id": "26d485c6-4085-4906-8972-1520a7c5eb26",
+      "titulo": "A Hora da Estrela",
+      "autor": "Clarice Lispector",
+      "genero": "Romance",
+      "capa": "",
+      "sinopse": "",
+      "totalExemplares": 10,
+      "disponiveis": 10,
+      "criadoEm": "2026-04-09T01:17:03.194Z"
+    },
+    {
+      "id": "a0e274f7-3fb0-4e55-a596-a989cd7b011e",
+      "titulo": "O Pequeno Príncipe",
+      "autor": "Antoine de Saint-Exupéry",
+      "genero": "Infantojuvenil",
+      "capa": "",
+      "sinopse": "",
+      "totalExemplares": 10,
+      "disponiveis": 10,
+      "criadoEm": "2026-04-09T01:17:03.199Z"
+    },
+    {
+      "id": "2b473d8b-8ce2-45ea-9d29-fe72fdefbf43",
+      "titulo": "Sagarana",
+      "autor": "João Guimarães Rosa",
+      "genero": "Contos",
+      "capa": "",
+      "sinopse": "",
+      "totalExemplares": 10,
+      "disponiveis": 10,
+      "criadoEm": "2026-04-09T01:17:03.205Z"
+    },
+    {
+      "id": "2150f061-d5db-49cd-a41e-9d808fa08ce5",
+      "titulo": "Memórias Póstumas de Brás Cubas",
+      "autor": "Machado de Assis",
+      "genero": "Romance",
+      "capa": "",
+      "sinopse": "",
+      "totalExemplares": 10,
+      "disponiveis": 9,
+      "criadoEm": "2026-04-09T01:17:03.212Z",
+      "atualizadoEm": "2026-04-09T01:34:01.899Z"
+    },
+    {
+      "id": "67aa97a1-0faa-4366-86b7-9f848a25a691",
+      "titulo": "Iracema",
+      "autor": "José de Alencar",
+      "genero": "Romance",
+      "capa": "",
+      "sinopse": "",
+      "totalExemplares": 10,
+      "disponiveis": 10,
+      "criadoEm": "2026-04-09T01:17:03.219Z"
+    },
+    {
+      "id": "b9810cf8-aa46-489b-84c1-73e1e45b5a0f",
+      "titulo": "Senhora",
+      "autor": "José de Alencar",
+      "genero": "Romance",
+      "capa": "",
+      "sinopse": "",
+      "totalExemplares": 10,
+      "disponiveis": 10,
+      "criadoEm": "2026-04-09T01:17:03.225Z"
+    }
+  ],
+  "emprestimos": [
+    {
+      "id": "809790ac-acd9-4efa-b073-79a060e1c1df",
+      "usuarioId": "1d113280-2224-4c34-bd93-ee8dfef33ac4",
+      "livroId": "8095859d-5719-4f80-849c-0cafb14504df",
+      "usuarioNome": "Usuario Teste",
+      "usuarioTurma": "3A",
+      "livroTitulo": "Dom Casmurro",
+      "livroAutor": "Machado de Assis",
+      "capa": "",
+      "status": "reservado",
+      "renovado": false,
+      "dataReserva": "2026-04-09T01:17:43.554Z"
+    },
+    {
+      "id": "b84a6255-fc5e-4836-84e1-6134907cb604",
+      "usuarioId": "1d113280-2224-4c34-bd93-ee8dfef33ac4",
+      "livroId": "64a75111-9c0a-4c9f-8790-03a18cb092f5",
+      "usuarioNome": "Usuario Teste",
+      "usuarioTurma": "3A",
+      "livroTitulo": "O Cravo e a Rosa",
+      "livroAutor": "Walcyr Carrasco",
+      "capa": "",
+      "status": "reservado",
+      "renovado": false,
+      "dataReserva": "2026-04-09T01:18:35.783Z"
+    },
+    {
+      "id": "1c23eafc-db21-4684-aab2-9eac6ad062f3",
+      "usuarioId": "06a1761e-83f8-4ab0-992a-d04bb01fc957",
+      "livroId": "8095859d-5719-4f80-849c-0cafb14504df",
+      "usuarioNome": "Adilson manoel",
+      "usuarioTurma": "3B",
+      "livroTitulo": "Dom Casmurro",
+      "livroAutor": "Machado de Assis",
+      "capa": "",
+      "status": "reservado",
+      "renovado": false,
+      "dataReserva": "2026-04-09T01:20:07.292Z",
+      "retiradaQrCodigo": "6F7CA229",
+      "retiradaQrPayload": "BIBLIO:1c23eafc-db21-4684-aab2-9eac6ad062f3:6F7CA229",
+      "retiradaQrGeradoEm": "2026-04-09T01:35:35.588Z",
+      "retiradaQrExpiraEm": "2026-04-09T01:50:35.588Z",
+      "retiradaQrUsadoEm": null,
+      "atualizadoEm": "2026-04-09T01:35:35.588Z"
+    },
+    {
+      "id": "0fab2f48-c857-4dd3-99d0-4d8a2b8ead14",
+      "usuarioId": "06a1761e-83f8-4ab0-992a-d04bb01fc957",
+      "livroId": "1066a42f-d4a8-416f-8552-d2682232de3e",
+      "usuarioNome": "Adilson manoel",
+      "usuarioTurma": "3B",
+      "livroTitulo": "Capitães da Areia",
+      "livroAutor": "Jorge Amado",
+      "capa": "",
+      "status": "reservado",
+      "renovado": false,
+      "dataReserva": "2026-04-09T01:31:26.969Z"
+    },
+    {
+      "id": "0cb65e0a-0ec8-4e47-a4fb-e40121947169",
+      "usuarioId": "06a1761e-83f8-4ab0-992a-d04bb01fc957",
+      "livroId": "2150f061-d5db-49cd-a41e-9d808fa08ce5",
+      "usuarioNome": "Adilson manoel",
+      "usuarioTurma": "3B",
+      "livroTitulo": "Memórias Póstumas de Brás Cubas",
+      "livroAutor": "Machado de Assis",
+      "capa": "",
+      "status": "reservado",
+      "renovado": false,
+      "dataReserva": "2026-04-09T01:34:01.899Z",
+      "retiradaQrCodigo": "081AB4C4",
+      "retiradaQrPayload": "BIBLIO:0cb65e0a-0ec8-4e47-a4fb-e40121947169:081AB4C4",
+      "retiradaQrGeradoEm": "2026-04-09T02:14:45.873Z",
+      "retiradaQrExpiraEm": "2026-04-09T02:29:45.873Z",
+      "retiradaQrUsadoEm": null,
+      "atualizadoEm": "2026-04-09T02:14:45.873Z"
+    }
+  ],
+  "recuperacoes": [
+    {
+      "id": "fc6d0366-2763-4ede-b97d-c9aa4bd050fb",
+      "email": "teste.20260407184127@aluno.mg.gov.br",
+      "codigoHash": "4f254a85b4b8a396b71d3501c5a83faa8632f9ac1a57c3bb747c8e60e3657bba",
+      "criadoEm": "2026-04-07T21:41:28.660Z",
+      "expiraEm": "2026-04-07T21:56:28.660Z",
+      "usadoEm": "2026-04-07T21:41:28.857Z"
+    },
+    {
+      "id": "500ca807-30b2-485e-8c60-588e79ed09c3",
+      "email": "teste.20260407184148@aluno.mg.gov.br",
+      "codigoHash": "1dd04624e1fa614a0320f0f73e354639221a431a59ce474b1dfcb8e952d97f5e",
+      "criadoEm": "2026-04-07T21:41:48.862Z",
+      "expiraEm": "2026-04-07T21:56:48.862Z",
+      "usadoEm": "2026-04-07T21:41:48.992Z"
+    }
+  ],
+  "avaliacoes": [],
+  "desejos": []
+}
