@@ -348,7 +348,7 @@ export default function App() {
   const [scanandoCapa, setScanandoCapa] = useState(false);
   const [livroScaneado, setLivroScaneado] = useState<{
     titulo: string; autor?: string; genero?: string;
-    sinopse?: string; totalExemplares: number;
+    sinopse?: string; totalExemplares: number; capa?: string;
   } | null>(null);
   const [salvandoScan, setSalvandoScan] = useState(false);
 
@@ -1681,42 +1681,78 @@ export default function App() {
       </View>
       <View style={{ padding: 16 }}>
         <Text style={s.sectionLabel}>EMPRÉSTIMOS ATIVOS</Text>
-        {emprestimosAtivos.map(emp => (
-          <View key={emp.id} style={s.loanCard}>
-            <View style={[s.loanCover, { backgroundColor: CORES.sage }]} />
-            <View style={s.loanInfo}>
-              <Text style={s.loanTitle}>{emp.livroTitulo || `Livro #${emp.livroId}`}</Text>
-              <Text style={s.loanAuthor}>{emp.livroAutor || '—'}</Text>
-              <View style={[s.badgeSmall, { backgroundColor: 'rgba(201,123,46,0.12)', marginTop: 6 }]}>
-                <Text style={[s.badgeText, { color: CORES.amber }]}>
-                  {emp.renovado ? '🔄 Renovado' : emp.status}
-                </Text>
-              </View>
-              {emp.dataReserva ? (
-                <Text style={[s.loanAuthor, { marginTop: 4 }]}>
-                  Reservado em {new Date(emp.dataReserva).toLocaleDateString('pt-BR')}
-                </Text>
-              ) : null}
-            </View>
-            <View style={{ gap: 6 }}>
-              {emp.status === 'reservado' ? (
-                <TouchableOpacity
-                  style={[s.btnAmber, { paddingHorizontal: 8, opacity: gerandoQrRetirada ? 0.7 : 1 }]}
-                  onPress={() => handleGerarQrRetirada(emp)}
-                  disabled={gerandoQrRetirada}>
-                  <Text style={s.btnAmberText}>📱 QR retirada</Text>
-                </TouchableOpacity>
-              ) : null}
-              {emp.status === 'retirado' && !emp.renovado && (
-                <TouchableOpacity
-                  style={[s.btnAmber, { paddingHorizontal: 8 }]}
-                  onPress={() => handleRenovar(emp)}>
-                  <Text style={s.btnAmberText}>🔄 Renovar</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+        {emprestimosAtivos.length === 0 ? (
+          <View style={s.emptyBox}>
+            <Text style={s.emptyText}>Nenhum empréstimo ativo</Text>
           </View>
-        ))}
+        ) : emprestimosAtivos.map(emp => {
+          // Calcula dias restantes para devolução
+          const hoje = new Date();
+          const dataDev = emp.dataDevolucao ? new Date(emp.dataDevolucao) : null;
+          const diasRestantes = dataDev
+            ? Math.ceil((dataDev.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24))
+            : null;
+          const atrasado = diasRestantes !== null && diasRestantes < 0;
+          const urgente = diasRestantes !== null && diasRestantes >= 0 && diasRestantes <= 3;
+
+          return (
+            <View key={emp.id} style={[s.loanCard, atrasado && { borderColor: CORES.rust, borderWidth: 1.5 }]}>
+              <View style={[s.loanCover, { backgroundColor: CORES.sage }]} />
+              <View style={s.loanInfo}>
+                <Text style={s.loanTitle}>{emp.livroTitulo || `Livro #${emp.livroId}`}</Text>
+                <Text style={s.loanAuthor}>{emp.livroAutor || '—'}</Text>
+                <View style={[s.badgeSmall, { backgroundColor: 'rgba(201,123,46,0.12)', marginTop: 6 }]}>
+                  <Text style={[s.badgeText, { color: CORES.amber }]}>
+                    {emp.renovado ? '🔄 Renovado' : emp.status}
+                  </Text>
+                </View>
+                {emp.dataReserva ? (
+                  <Text style={[s.loanAuthor, { marginTop: 4 }]}>
+                    Reservado em {new Date(emp.dataReserva).toLocaleDateString('pt-BR')}
+                  </Text>
+                ) : null}
+
+                {/* ── DATA DE DEVOLUÇÃO ── */}
+                {dataDev && emp.status === 'retirado' ? (
+                  <View style={{ marginTop: 6 }}>
+                    <Text style={[s.loanAuthor, {
+                      color: atrasado ? CORES.rust : urgente ? CORES.amber : CORES.sage,
+                      fontWeight: '600',
+                    }]}>
+                      {atrasado
+                        ? `⚠️ Atrasado ${Math.abs(diasRestantes!)} dia(s)`
+                        : urgente
+                          ? `⚠️ Vence em ${diasRestantes} dia(s)`
+                          : `📅 Devolver até ${dataDev.toLocaleDateString('pt-BR')}`}
+                    </Text>
+                    {!atrasado && !urgente && (
+                      <Text style={[s.loanAuthor, { color: CORES.muted }]}>
+                        {diasRestantes} dia(s) restante(s)
+                      </Text>
+                    )}
+                  </View>
+                ) : null}
+              </View>
+              <View style={{ gap: 6 }}>
+                {emp.status === 'reservado' ? (
+                  <TouchableOpacity
+                    style={[s.btnAmber, { paddingHorizontal: 8, opacity: gerandoQrRetirada ? 0.7 : 1 }]}
+                    onPress={() => handleGerarQrRetirada(emp)}
+                    disabled={gerandoQrRetirada}>
+                    <Text style={s.btnAmberText}>📱 QR retirada</Text>
+                  </TouchableOpacity>
+                ) : null}
+                {emp.status === 'retirado' && !emp.renovado && (
+                  <TouchableOpacity
+                    style={[s.btnAmber, { paddingHorizontal: 8 }]}
+                    onPress={() => handleRenovar(emp)}>
+                    <Text style={s.btnAmberText}>🔄 Renovar</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          );
+        })}
         <Text style={[s.sectionLabel, { marginTop: 16 }]}>HISTÓRICO</Text>
         {historico.length === 0 ? (
           <View style={s.emptyBox}>
@@ -2076,8 +2112,27 @@ export default function App() {
 
             {livroScaneado && (
               <View style={{ marginTop: 16 }}>
+                {/* ── DADOS IDENTIFICADOS ── */}
                 <Text style={[s.sectionLabel, { marginTop: 0 }]}>DADOS IDENTIFICADOS</Text>
                 <View style={[s.loanCard, { flexDirection: 'column', gap: 8 }]}>
+                  {/* Preview da capa se encontrada */}
+                  {livroScaneado.capa ? (
+                    <View style={{ alignItems: 'center', marginBottom: 8 }}>
+                      <Image
+                        source={{ uri: livroScaneado.capa }}
+                        style={{ width: 80, height: 110, borderRadius: 8 }}
+                        resizeMode="cover"
+                      />
+                      <Text style={[s.loanAuthor, { marginTop: 4, color: CORES.sage }]}>✓ Capa encontrada</Text>
+                    </View>
+                  ) : (
+                    <View style={{ alignItems: 'center', marginBottom: 8 }}>
+                      <View style={{ width: 80, height: 110, borderRadius: 8, backgroundColor: CORES.warm, alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={{ fontSize: 32 }}>📚</Text>
+                      </View>
+                      <Text style={[s.loanAuthor, { marginTop: 4, color: CORES.muted }]}>Sem capa disponível</Text>
+                    </View>
+                  )}
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                     <Text style={[s.loanAuthor, { fontWeight: '700', color: CORES.muted }]}>Título</Text>
                     <Text style={[s.loanTitle, { flex: 1, textAlign: 'right' }]}>{livroScaneado.titulo}</Text>
@@ -2520,3 +2575,5 @@ export default function App() {
     </SafeAreaView>
   );
 }
+
+
