@@ -272,6 +272,7 @@ export default function App() {
   const [abaAtiva, setAbaAtiva] = useState<AbaUsuario>('home');
   const [abaProfessor, setAbaProfessor] = useState<AbaProfessor>('home');
   const [abaBiblio, setAbaBiblio] = useState<AbaBiblio>('dashboard');
+  const [token, setToken] = useState<string>('');
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [mostrarSenha, setMostrarSenha] = useState(false);
@@ -370,6 +371,17 @@ export default function App() {
     return () => clearInterval(clockTimer);
   }, []);
 
+  // Configura o token JWT em todas as requisições axios automaticamente
+  useEffect(() => {
+    const interceptor = axios.interceptors.request.use(config => {
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      return config;
+    });
+    return () => axios.interceptors.request.eject(interceptor);
+  }, [token]);
+
   const livrosFiltrados = livros.filter(livro => {
     const textoOk = livro.titulo?.toLowerCase().includes(buscaTexto.toLowerCase()) ||
       livro.autor?.toLowerCase().includes(buscaTexto.toLowerCase());
@@ -433,6 +445,7 @@ export default function App() {
       const iniciais = data.nome.split(' ').map((p: string) => p[0].toUpperCase()).join('').slice(0, 2);
       const usuarioLogado = { ...data, iniciais };
       setUsuario(usuarioLogado);
+      setToken(data.token); // ← salva o token JWT
       if (data.perfil === 'aluno') {
         setTela('main'); setAbaAtiva('home');
       } else if (data.perfil === 'professor') {
@@ -936,6 +949,7 @@ export default function App() {
     Alert.alert('Sair', 'Deseja sair da conta?', [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Sair', style: 'destructive', onPress: () => {
+        setToken(''); // ← limpa o token
         setTela('login'); setEmail(''); setSenha(''); setErro('');
         setLivros([]); setEmprestimosAtivos([]); setHistorico([]);
         setTodasAvaliacoes([]); setTelaResenha(false); setLivroParaResenhar(null);
@@ -2575,5 +2589,6 @@ export default function App() {
     </SafeAreaView>
   );
 }
+
 
 
