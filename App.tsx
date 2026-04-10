@@ -298,6 +298,8 @@ export default function App() {
   const [desejos, setDesejos] = useState<Desejo[]>([]);
   const [telaListaDesejos, setTelaListaDesejos] = useState(false);
   const [togglendoDesejo, setTogglendoDesejo] = useState<string | null>(null);
+  const [telaHistorico, setTelaHistorico] = useState(false);
+  const [telaComunicadosPerfil, setTelaComunicadosPerfil] = useState(false);
 
   const [cadNome, setCadNome] = useState('');
   const [cadEmail, setCadEmail] = useState('');
@@ -950,6 +952,8 @@ export default function App() {
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Sair', style: 'destructive', onPress: () => {
         setToken(''); // ← limpa o token
+        setTelaHistorico(false);
+        setTelaComunicadosPerfil(false);
         setTela('login'); setEmail(''); setSenha(''); setErro('');
         setLivros([]); setEmprestimosAtivos([]); setHistorico([]);
         setTodasAvaliacoes([]); setTelaResenha(false); setLivroParaResenhar(null);
@@ -1891,6 +1895,112 @@ export default function App() {
       { id: 'meta-4', icon: '⭐', nome: 'Crítico Literário', descricao: 'Enviar 3 avaliações', progresso: avaliacoesAluno.length, meta: 3 },
       { id: 'meta-5', icon: '💡', nome: 'Explorador de Títulos', descricao: 'Salvar 5 livros na lista de desejos', progresso: desejos.length, meta: 5 },
     ];
+
+    // Tela de histórico
+    if (telaHistorico) {
+      return (
+        <ScrollView style={{ flex: 1 }}>
+          <View style={s.homeHeader}>
+            <TouchableOpacity onPress={() => setTelaHistorico(false)} style={{ marginRight: 12 }}>
+              <Text style={{ color: CORES.amberLt, fontSize: 16, fontWeight: '700' }}>← Voltar</Text>
+            </TouchableOpacity>
+            <View style={{ flex: 1 }}>
+              <Text style={s.homeGreeting}>Histórico de Empréstimos</Text>
+              <Text style={s.homeName}>{historico.length} livro(s) lido(s)</Text>
+            </View>
+          </View>
+          <View style={{ padding: 16 }}>
+            {historico.length === 0 ? (
+              <View style={s.emptyBox}>
+                <Text style={{ fontSize: 40, textAlign: 'center', marginBottom: 12 }}>📚</Text>
+                <Text style={s.emptyText}>Você ainda não devolveu nenhum livro.{'\n'}Seu histórico aparecerá aqui.</Text>
+              </View>
+            ) : historico.map(h => {
+              const minhaAv = todasAvaliacoes.find(a => a.usuarioId === usuario?.id && a.livroId === h.livroId);
+              return (
+                <View key={h.id} style={s.loanCard}>
+                  <View style={[s.loanCover, { backgroundColor: CORES.muted }]} />
+                  <View style={s.loanInfo}>
+                    <Text style={s.loanTitle}>{h.livroTitulo || `Livro #${h.livroId}`}</Text>
+                    <Text style={s.loanAuthor}>{h.livroAutor || '—'}</Text>
+                    {h.dataDevolucao ? (
+                      <Text style={[s.loanAuthor, { marginTop: 4 }]}>
+                        Devolvido em {new Date(h.dataDevolucao).toLocaleDateString('pt-BR')}
+                      </Text>
+                    ) : null}
+                    {minhaAv ? (
+                      <View style={{ flexDirection: 'row', gap: 2, marginTop: 6 }}>
+                        {[1,2,3,4,5].map(i => (
+                          <Text key={i} style={{ fontSize: 13, color: i <= minhaAv.nota ? CORES.amber : CORES.border }}>★</Text>
+                        ))}
+                      </View>
+                    ) : null}
+                  </View>
+                  {minhaAv ? (
+                    <TouchableOpacity
+                      style={[s.badgeSmall, { backgroundColor: 'rgba(201,123,46,0.12)' }]}
+                      onPress={() => { setLivroParaResenhar(h); setTelaResenha(true); }}>
+                      <Text style={[s.badgeText, { color: CORES.amber }]}>✎ Editar</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      style={[s.btnAmber, { paddingHorizontal: 10 }]}
+                      onPress={() => { setNotaResenha(0); setTextoResenha(''); setLivroParaResenhar(h); setTelaResenha(true); }}>
+                      <Text style={s.btnAmberText}>⭐ Avaliar</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        </ScrollView>
+      );
+    }
+
+    // Tela de comunicados/notificações
+    if (telaComunicadosPerfil) {
+      return (
+        <ScrollView style={{ flex: 1 }}>
+          <View style={s.homeHeader}>
+            <TouchableOpacity onPress={() => setTelaComunicadosPerfil(false)} style={{ marginRight: 12 }}>
+              <Text style={{ color: CORES.amberLt, fontSize: 16, fontWeight: '700' }}>← Voltar</Text>
+            </TouchableOpacity>
+            <View style={{ flex: 1 }}>
+              <Text style={s.homeGreeting}>Notificações</Text>
+              <Text style={s.homeName}>{comunicados.length} comunicado(s)</Text>
+            </View>
+          </View>
+          <View style={{ padding: 16 }}>
+            {comunicados.length === 0 ? (
+              <View style={s.emptyBox}>
+                <Text style={{ fontSize: 40, textAlign: 'center', marginBottom: 12 }}>📢</Text>
+                <Text style={s.emptyText}>Nenhum comunicado no momento</Text>
+              </View>
+            ) : comunicados.map((com: any) => (
+              <View key={com.id} style={s.comunicadoCard}>
+                <View style={s.comunicadoHeader}>
+                  <View style={s.comunicadoIconWrap}>
+                    <Text style={{ fontSize: 20 }}>
+                      {com.destinatario === 'alunos' ? '🎒' :
+                       com.destinatario === 'professores' ? '📖' : '📢'}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.comunicadoTitulo}>{com.titulo}</Text>
+                    <Text style={s.comunicadoMeta}>
+                      {com.criadoEm ? new Date(com.criadoEm).toLocaleDateString('pt-BR') : '—'}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={s.comunicadoMensagem}>{com.mensagem}</Text>
+                <Text style={s.comunicadoAutor}>Enviado por: {com.autor}</Text>
+              </View>
+            ))}
+          </View>
+        </ScrollView>
+      );
+    }
+
     return (
       <ScrollView style={{ flex: 1 }}>
         <View style={s.perfilTop}>
@@ -1914,13 +2024,11 @@ export default function App() {
         </View>
         <View style={{ padding: 16 }}>
           {[
-            { icon: '📚', title: 'Histórico de Empréstimos', sub: `${historico.length} livros lidos` },
-            { icon: '🤍', title: 'Minha Lista de Desejos', sub: `${desejos.length} título(s) salvos` },
-            { icon: '🔔', title: 'Notificações', sub: 'Configurar alertas' },
-            { icon: '✏️', title: 'Editar perfil', sub: 'Atualizar informações' },
+            { icon: '📚', title: 'Histórico de Empréstimos', sub: `${historico.length} livro(s) lido(s)`, acao: () => setTelaHistorico(true) },
+            { icon: '🤍', title: 'Minha Lista de Desejos', sub: `${desejos.length} título(s) salvos`, acao: () => setTelaListaDesejos(true) },
+            { icon: '🔔', title: 'Notificações', sub: `${comunicados.length} comunicado(s)`, acao: () => setTelaComunicadosPerfil(true) },
           ].map((item, i) => (
-            <TouchableOpacity key={i} style={s.menuItem}
-              onPress={i === 1 ? () => setTelaListaDesejos(true) : undefined}>
+            <TouchableOpacity key={i} style={s.menuItem} onPress={item.acao}>
               <View style={s.menuIcon}><Text style={{ fontSize: 18 }}>{item.icon}</Text></View>
               <View style={{ flex: 1 }}>
                 <Text style={s.menuTitle}>{item.title}</Text>
@@ -2578,6 +2686,8 @@ export default function App() {
               setLivroSelecionado(null);
               setTelaListaDesejos(false);
               setTelaQrRetirada(false);
+              setTelaHistorico(false);
+              setTelaComunicadosPerfil(false);
             }}>
             <Text style={{ fontSize: 20 }}>{aba.icon}</Text>
             <Text style={[s.tabLabel, abaAtiva === aba.key && { color: CORES.amber, fontWeight: '600' }]}>
@@ -2589,6 +2699,3 @@ export default function App() {
     </SafeAreaView>
   );
 }
-
-
-
