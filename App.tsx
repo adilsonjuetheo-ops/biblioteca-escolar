@@ -33,7 +33,7 @@ const BIBLIOTECA = 'Biblioteca Marlene de Souza Queiroz';
 type Perfil = 'aluno' | 'professor' | 'bibliotecario';
 type Tela = 'login' | 'cadastroAluno' | 'cadastroProfessor' | 'esqueci' | 'main' | 'professor' | 'bibliotecario';
 type AbaUsuario = 'home' | 'buscar' | 'historico' | 'livros' | 'avisos' | 'perfil';
-type AbaProfessor = 'home' | 'buscar' | 'historico' | 'turma' | 'perfil';
+type AbaProfessor = 'home' | 'buscar' | 'historico' | 'turma' | 'avisos' | 'perfil';
 type AbaBiblio = 'dashboard' | 'gestao' | 'admin' | 'avisos' | 'perfil';
 
 type Usuario = {
@@ -2546,8 +2546,8 @@ export default function App() {
       { key: 'dashboard', icon: '📊', label: 'Painel' },
       { key: 'gestao', icon: '📚', label: 'Gestão' },
       { key: 'admin', icon: '🛠️', label: 'Admin' },
-      { key: 'perfil', icon: '👤', label: 'Perfil' },
       { key: 'avisos', icon: '🔔', label: 'Avisos' },
+      { key: 'perfil', icon: '👤', label: 'Perfil' },
     ];
 
     return (
@@ -2811,6 +2811,7 @@ export default function App() {
       { key: 'home', icon: '🏠', label: 'Início' },
       { key: 'buscar', icon: '🔍', label: 'Explorar' },
       { key: 'turma', icon: '👥', label: 'Turma' },
+      { key: 'avisos', icon: '🔔', label: 'Avisos' },
       { key: 'perfil', icon: '👤', label: 'Perfil' },
     ];
 
@@ -2822,6 +2823,7 @@ export default function App() {
           {abaProfessor === 'buscar' && !livroSelecionado && renderBusca()}
           {abaProfessor === 'buscar' && livroSelecionado && renderDetalhe()}
           {abaProfessor === 'turma' && renderTurmaProfessor()}
+          {abaProfessor === 'avisos' && renderNotificacoes()}
           {abaProfessor === 'perfil' && renderPerfilProfessor()}
         </View>
         <View style={s.tabBar}>
