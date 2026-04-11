@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import {
   View, Text, TextInput, TouchableOpacity,
@@ -373,16 +373,24 @@ export default function App() {
     return () => clearInterval(clockTimer);
   }, []);
 
-  // Configura o token JWT em todas as requisições axios automaticamente
-  useEffect(() => {
+  // Ref para guardar o token — garante que o interceptor sempre usa o valor mais atual
+  const tokenRef = React.useRef<string>('');
+
+  // Atualiza a ref sempre que o token mudar
+  React.useEffect(() => {
+    tokenRef.current = token;
+  }, [token]);
+
+  // Configura o interceptor uma única vez — usa a ref para sempre ter o token atualizado
+  React.useEffect(() => {
     const interceptor = axios.interceptors.request.use(config => {
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+      if (tokenRef.current) {
+        config.headers.Authorization = `Bearer ${tokenRef.current}`;
       }
       return config;
     });
     return () => axios.interceptors.request.eject(interceptor);
-  }, [token]);
+  }, []);
 
   const livrosFiltrados = livros.filter(livro => {
     const textoOk = livro.titulo?.toLowerCase().includes(buscaTexto.toLowerCase()) ||
@@ -396,25 +404,26 @@ export default function App() {
 
   const generosUnicos = ['todos', ...Array.from(new Set(livros.map(l => l.genero).filter(Boolean))) as string[]];
 
-  async function carregarDados(usuarioAtual = usuario) {
+  async function carregarDados(usuarioAtual = usuario, tokenAtual = tokenRef.current) {
     setCarregando(true);
     setErroConexao(false);
     try {
       const uid = usuarioAtual?.id;
       const safe = <T,>(p: Promise<{ data: T }>, fallback: T): Promise<{ data: T }> =>
         p.catch(() => ({ data: fallback }));
+      const headers = tokenAtual ? { Authorization: `Bearer ${tokenAtual}` } : {};
       const [resLivros, resEmp, resAvaliacoes, resDesejos, resUsuarios, resComunicados, resSuspensoes] = await Promise.all([
-        axios.get(`${API_URL}/livros`),
-        axios.get(`${API_URL}/emprestimos`),
-        safe(axios.get(`${API_URL}/avaliacoes`), [] as Avaliacao[]),
+        axios.get(`${API_URL}/livros`, { headers }),
+        axios.get(`${API_URL}/emprestimos`, { headers }),
+        safe(axios.get(`${API_URL}/avaliacoes`, { headers }), [] as Avaliacao[]),
         uid
-          ? safe(axios.get(`${API_URL}/desejos?usuarioId=${uid}`), [] as Desejo[])
+          ? safe(axios.get(`${API_URL}/desejos?usuarioId=${uid}`, { headers }), [] as Desejo[])
           : Promise.resolve({ data: [] as Desejo[] }),
         usuarioAtual?.perfil === 'bibliotecario'
-          ? safe(axios.get(`${API_URL}/usuarios`), [] as Usuario[])
+          ? safe(axios.get(`${API_URL}/usuarios`, { headers }), [] as Usuario[])
           : Promise.resolve({ data: [] as Usuario[] }),
-        safe(axios.get(`${API_URL}/comunicados`), []),
-        safe(axios.get(`${API_URL}/suspensoes`), []),
+        safe(axios.get(`${API_URL}/comunicados`, { headers }), []),
+        safe(axios.get(`${API_URL}/suspensoes`, { headers }), []),
       ]);
       setLivros(Array.isArray(resLivros.data) ? resLivros.data as Livro[] : []);
       const todosEmprestimos: Emprestimo[] = Array.isArray(resEmp.data) ? resEmp.data : [];
@@ -447,7 +456,8 @@ export default function App() {
       const iniciais = data.nome.split(' ').map((p: string) => p[0].toUpperCase()).join('').slice(0, 2);
       const usuarioLogado = { ...data, iniciais };
       setUsuario(usuarioLogado);
-      setToken(data.token); // ← salva o token JWT
+      setToken(data.token);
+      tokenRef.current = data.token; // ← atualiza a ref imediatamente
       if (data.perfil === 'aluno') {
         setTela('main'); setAbaAtiva('home');
       } else if (data.perfil === 'professor') {
@@ -455,7 +465,7 @@ export default function App() {
       } else {
         setTela('bibliotecario'); setAbaBiblio('dashboard');
       }
-      await carregarDados(usuarioLogado);
+      await carregarDados(usuarioLogado, data.token); // ← passa token diretamente
     } catch (err: unknown) {
       setErro(getApiErrorMessage(err, 'E-mail ou senha incorretos'));
     } finally {
@@ -545,6 +555,15 @@ export default function App() {
     }
   }
 
+  // Ref para guardar o intervalo do polling do QR — permite cancelar ao apertar Voltar
+  const intervaloQrRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+  const timeoutQrRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function cancelarPollingQr() {
+    if (intervaloQrRef.current) { clearInterval(intervaloQrRef.current); intervaloQrRef.current = null; }
+    if (timeoutQrRef.current) { clearTimeout(timeoutQrRef.current); timeoutQrRef.current = null; }
+  }
+
   async function handleGerarQrRetirada(emp: Emprestimo) {
     setGerandoQrRetirada(true);
     try {
@@ -556,14 +575,15 @@ export default function App() {
       setTelaQrRetirada(true);
       await carregarDados();
 
-      let timeout = setTimeout(() => clearInterval(intervalo), 300000);
-      const intervalo = setInterval(async () => {
+      // Cancela qualquer polling anterior
+      cancelarPollingQr();
+
+      intervaloQrRef.current = setInterval(async () => {
         try {
           const { data: empAtualizado } = await axios.get(`${API_URL}/emprestimos`);
           const empEncontrado = empAtualizado.find((e: Emprestimo) => e.id === emp.id);
           if (empEncontrado?.status === 'retirado') {
-            clearInterval(intervalo);
-            clearTimeout(timeout);
+            cancelarPollingQr();
             setTelaQrRetirada(false);
             setEmprestimoQrAtual(null);
             setDadosQrRetirada(null);
@@ -571,11 +591,13 @@ export default function App() {
             await carregarDados();
           }
         } catch {
-          clearInterval(intervalo);
+          cancelarPollingQr();
         }
       }, 3000);
 
-      timeout = setTimeout(() => clearInterval(intervalo), 300000);
+      // Timeout de 5 minutos
+      timeoutQrRef.current = setTimeout(() => cancelarPollingQr(), 300000);
+
     } catch (err: unknown) {
       Alert.alert('Erro', getApiErrorMessage(err, 'Não foi possível gerar QR de retirada.'));
     } finally {
@@ -584,7 +606,12 @@ export default function App() {
   }
 
   async function validarRetiradaPorQr(codigoEntrada: string, exibirAlertas = true) {
-    const codigo = codigoEntrada.trim();
+    // O QR pode conter o payload completo "BIBLIO:7:BB300A44" ou só o código "BB300A44"
+    let codigo = codigoEntrada.trim();
+    if (codigo.startsWith('BIBLIO:')) {
+      const partes = codigo.split(':');
+      codigo = partes[partes.length - 1]; // pega só o código final
+    }
     if (!codigo) return null;
     setValidandoQrRetirada(true);
     try {
@@ -620,13 +647,18 @@ export default function App() {
         return;
       }
     }
+    scanBloqueadoRef.current = false;
     setScanBloqueado(false);
     setScannerFeedback(null);
     setTelaScannerQr(true);
   }
 
+  // Ref para bloqueio imediato do scanner — evita múltiplos scans simultâneos
+  const scanBloqueadoRef = React.useRef(false);
+
   async function handleQrScaneado(data: string) {
-    if (scanBloqueado) return;
+    if (scanBloqueadoRef.current) return;
+    scanBloqueadoRef.current = true;
     setScanBloqueado(true);
     const emprestimo = await validarRetiradaPorQr(data, false);
     if (emprestimo) {
@@ -637,9 +669,12 @@ export default function App() {
       setTimeout(() => {
         setTelaScannerQr(false);
         setScannerFeedback(null);
+        scanBloqueadoRef.current = false;
+        setScanBloqueado(false);
       }, 1200);
     } else {
       Alert.alert('Erro', 'QR invalido, expirado ou ja utilizado.');
+      scanBloqueadoRef.current = false;
       setScanBloqueado(false);
     }
   }
@@ -1669,7 +1704,14 @@ export default function App() {
     return (
       <ScrollView style={{ flex: 1 }}>
         <View style={s.homeHeader}>
-          <TouchableOpacity onPress={() => setTelaQrRetirada(false)} style={{ marginRight: 12 }}>
+          <TouchableOpacity
+            onPress={() => {
+              cancelarPollingQr();
+              setTelaQrRetirada(false);
+              setEmprestimoQrAtual(null);
+              setDadosQrRetirada(null);
+            }}
+            style={{ marginRight: 12 }}>
             <Text style={{ color: CORES.amberLt, fontSize: 16, fontWeight: '700' }}>← Voltar</Text>
           </TouchableOpacity>
           <Text style={[s.homeGreeting, { flex: 1 }]}>QR para retirada física</Text>
@@ -2423,7 +2465,10 @@ export default function App() {
           </View>
           <Text style={s.scannerHint}>Aponte para o QR exibido no celular do aluno.</Text>
           {scanBloqueado ? (
-            <TouchableOpacity style={[s.btnSecundario, { marginTop: 8 }]} onPress={() => setScanBloqueado(false)}>
+            <TouchableOpacity style={[s.btnSecundario, { marginTop: 8 }]} onPress={() => {
+              scanBloqueadoRef.current = false;
+              setScanBloqueado(false);
+            }}>
               <Text style={s.btnSecundarioText}>Escanear novamente</Text>
             </TouchableOpacity>
           ) : null}
