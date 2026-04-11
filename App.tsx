@@ -414,8 +414,8 @@ export default function App() {
         p.catch(() => ({ data: fallback }));
       const headers = tokenAtual ? { Authorization: `Bearer ${tokenAtual}` } : {};
       const [resLivros, resEmp, resAvaliacoes, resDesejos, resUsuarios, resComunicados, resSuspensoes] = await Promise.all([
-        axios.get(`${API_URL}/livros`, { headers }),
-        axios.get(`${API_URL}/emprestimos`, { headers }),
+        safe(axios.get(`${API_URL}/livros`, { headers }), [] as Livro[]),
+        safe(axios.get(`${API_URL}/emprestimos`, { headers }), [] as Emprestimo[]),
         safe(axios.get(`${API_URL}/avaliacoes`, { headers }), [] as Avaliacao[]),
         uid
           ? safe(axios.get(`${API_URL}/desejos?usuarioId=${uid}`, { headers }), [] as Desejo[])
@@ -2977,7 +2977,12 @@ export default function App() {
         <View style={s.tabBar}>
           {abasProfessor.map(aba => (
             <TouchableOpacity key={aba.key} style={s.tabItem}
-              onPress={() => { setAbaProfessor(aba.key as AbaProfessor); setLivroSelecionado(null); }}>
+              onPress={() => {
+                const novaAba = aba.key as AbaProfessor;
+                setAbaProfessor(novaAba);
+                setLivroSelecionado(null);
+                if (novaAba === 'reservas' || novaAba === 'ranking') carregarDados();
+              }}>
               <Text style={{ fontSize: 20 }}>{aba.icon}</Text>
               <Text style={[s.tabLabel, abaProfessor === aba.key && { color: CORES.amber, fontWeight: '600' }]}>
                 {aba.label}
