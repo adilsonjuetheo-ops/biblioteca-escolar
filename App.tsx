@@ -33,7 +33,7 @@ const BIBLIOTECA = 'Biblioteca Marlene de Souza Queiroz';
 type Perfil = 'aluno' | 'professor' | 'bibliotecario';
 type Tela = 'login' | 'cadastroAluno' | 'cadastroProfessor' | 'esqueci' | 'main' | 'professor' | 'bibliotecario';
 type AbaUsuario = 'home' | 'buscar' | 'historico' | 'livros' | 'avisos' | 'perfil';
-type AbaProfessor = 'home' | 'buscar' | 'historico' | 'turma' | 'avisos' | 'perfil';
+type AbaProfessor = 'home' | 'buscar' | 'reservas' | 'ranking' | 'avisos' | 'perfil';
 type AbaBiblio = 'dashboard' | 'gestao' | 'admin' | 'avisos' | 'perfil';
 
 type Usuario = {
@@ -322,6 +322,7 @@ export default function App() {
   const [recLoading, setRecLoading] = useState(false);
 
   const [usuariosAdmin, setUsuariosAdmin] = useState<Usuario[]>([]);
+  const [emprestimosEscola, setEmprestimosEscola] = useState<Emprestimo[]>([]);
   const [livroTituloNovo, setLivroTituloNovo] = useState('');
   const [livroAutorNovo, setLivroAutorNovo] = useState('');
   const [livroGeneroNovo, setLivroGeneroNovo] = useState('');
@@ -430,8 +431,10 @@ export default function App() {
       const isBiblio = usuarioAtual?.perfil === 'bibliotecario';
       const ativos = todosEmprestimos.filter(e => e.status === 'reservado' || e.status === 'retirado');
       const devolvidos = todosEmprestimos.filter(e => e.status === 'devolvido');
+      const isProf = usuarioAtual?.perfil === 'professor';
       setEmprestimosAtivos(isBiblio ? ativos : ativos.filter(e => e.usuarioId === uid));
       setHistorico(isBiblio ? devolvidos : devolvidos.filter(e => e.usuarioId === uid));
+      if (isBiblio || isProf) setEmprestimosEscola(todosEmprestimos);
       setTodasAvaliacoes(Array.isArray(resAvaliacoes.data) ? resAvaliacoes.data as Avaliacao[] : []);
       setDesejos(Array.isArray(resDesejos.data) ? (resDesejos.data as unknown) as Desejo[] : []);
       setUsuariosAdmin(Array.isArray(resUsuarios.data) ? resUsuarios.data as Usuario[] : []);
@@ -2721,45 +2724,183 @@ export default function App() {
       </ScrollView>
     );
 
-    const renderTurmaProfessor = () => (
-      <ScrollView style={{ flex: 1 }}>
-        <View style={s.homeHeader}>
-          <View>
-            <Text style={s.homeGreeting}>Empréstimos da turma</Text>
-            <Text style={s.homeName}>{emprestimosAtivos.length} ativos</Text>
-          </View>
-        </View>
-        <View style={{ padding: 16 }}>
-          <Text style={s.sectionLabel}>TODOS OS EMPRÉSTIMOS ATIVOS</Text>
-          {carregando ? (
-            <ActivityIndicator color={CORES.amber} size="large" style={{ marginTop: 40 }} />
-          ) : emprestimosAtivos.length === 0 ? (
-            <View style={s.emptyBox}>
-              <Text style={s.emptyText}>Nenhum empréstimo ativo no momento</Text>
+    const renderReservasProfessor = () => {
+      const meusAtivos = emprestimosAtivos.filter(e => e.usuarioId === usuario?.id);
+      const meuHistorico = historico.filter(e => e.usuarioId === usuario?.id);
+      return (
+        <ScrollView style={{ flex: 1 }}>
+          <View style={s.homeHeader}>
+            <View>
+              <Text style={s.homeGreeting}>Minhas Reservas</Text>
+              <Text style={s.homeName}>{meusAtivos.length} ativa(s)</Text>
             </View>
-          ) : emprestimosAtivos.map(emp => (
-            <View key={emp.id} style={s.loanCard}>
-              {emp.capa ? (
-                <Image source={{ uri: emp.capa }} style={s.loanCover} resizeMode="cover" />
-              ) : (
-                <View style={[s.loanCover, { backgroundColor: CORES.sage }]} />
-              )}
-              <View style={s.loanInfo}>
-                <Text style={s.loanTitle}>{emp.livroTitulo || `Livro #${emp.livroId}`}</Text>
-                <Text style={s.loanAuthor}>{emp.livroAutor || '—'}</Text>
-                <Text style={[s.loanAuthor, { color: CORES.amber, marginTop: 2 }]}>
-                  👤 {emp.usuarioNome || `Aluno #${emp.usuarioId}`}
-                  {emp.usuarioTurma ? ` · Turma ${emp.usuarioTurma}` : ''}
-                </Text>
-                <View style={[s.badgeSmall, { backgroundColor: 'rgba(201,123,46,0.12)', marginTop: 6 }]}>
-                  <Text style={[s.badgeText, { color: CORES.amber }]}>{emp.status}</Text>
+          </View>
+          <View style={{ padding: 16, gap: 12 }}>
+            <Text style={s.sectionLabel}>EMPRÉSTIMOS ATIVOS</Text>
+            {carregando ? (
+              <ActivityIndicator color={CORES.amber} size="large" style={{ marginTop: 40 }} />
+            ) : meusAtivos.length === 0 ? (
+              <View style={s.emptyBox}>
+                <Text style={s.emptyText}>Nenhum empréstimo ativo</Text>
+              </View>
+            ) : meusAtivos.map(emp => {
+              const hoje = new Date();
+              const dataDev = emp.dataDevolucao ? new Date(emp.dataDevolucao) : null;
+              const diasRestantes = dataDev
+                ? Math.ceil((dataDev.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24))
+                : null;
+              const atrasado = diasRestantes !== null && diasRestantes < 0;
+              const urgente = diasRestantes !== null && diasRestantes >= 0 && diasRestantes <= 3;
+              return (
+                <View key={emp.id} style={[s.loanCard, atrasado && { borderColor: CORES.rust, borderWidth: 1.5 }]}>
+                  {emp.capa ? (
+                    <Image source={{ uri: emp.capa }} style={s.loanCover} resizeMode="cover" />
+                  ) : (
+                    <View style={[s.loanCover, { backgroundColor: CORES.sage }]} />
+                  )}
+                  <View style={s.loanInfo}>
+                    <Text style={s.loanTitle}>{emp.livroTitulo || `Livro #${emp.livroId}`}</Text>
+                    <Text style={s.loanAuthor}>{emp.livroAutor || '—'}</Text>
+                    <View style={[s.badgeSmall, { backgroundColor: 'rgba(201,123,46,0.12)', marginTop: 6 }]}>
+                      <Text style={[s.badgeText, { color: CORES.amber }]}>
+                        {emp.renovado ? '🔄 Renovado' : emp.status}
+                      </Text>
+                    </View>
+                    {emp.dataReserva ? (
+                      <Text style={[s.loanAuthor, { marginTop: 4 }]}>
+                        Reservado em {new Date(emp.dataReserva).toLocaleDateString('pt-BR')}
+                      </Text>
+                    ) : null}
+                    {dataDev && emp.status === 'retirado' ? (
+                      <View style={{ marginTop: 6 }}>
+                        <Text style={[s.loanAuthor, {
+                          color: atrasado ? CORES.rust : urgente ? CORES.amber : CORES.sage,
+                          fontWeight: '600',
+                        }]}>
+                          {atrasado
+                            ? `⚠️ Atrasado ${Math.abs(diasRestantes!)} dia(s)`
+                            : urgente
+                              ? `⚠️ Vence em ${diasRestantes} dia(s)`
+                              : `📅 Devolver até ${dataDev.toLocaleDateString('pt-BR')}`}
+                        </Text>
+                        {!atrasado && !urgente && (
+                          <Text style={[s.loanAuthor, { color: CORES.muted }]}>
+                            {diasRestantes} dia(s) restante(s)
+                          </Text>
+                        )}
+                      </View>
+                    ) : null}
+                  </View>
+                  <View style={{ gap: 6 }}>
+                    {emp.status === 'reservado' ? (
+                      <TouchableOpacity
+                        style={[s.btnAmber, { paddingHorizontal: 8, opacity: gerandoQrRetirada ? 0.7 : 1 }]}
+                        onPress={() => handleGerarQrRetirada(emp)}
+                        disabled={gerandoQrRetirada}>
+                        <Text style={s.btnAmberText}>📱 QR retirada</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                    {emp.status === 'retirado' && !emp.renovado && (
+                      <TouchableOpacity
+                        style={[s.btnAmber, { paddingHorizontal: 8 }]}
+                        onPress={() => handleRenovar(emp)}>
+                        <Text style={s.btnAmberText}>🔄 Renovar</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+            <Text style={[s.sectionLabel, { marginTop: 8 }]}>HISTÓRICO</Text>
+            {meuHistorico.length === 0 ? (
+              <View style={s.emptyBox}>
+                <Text style={s.emptyText}>Nenhuma devolução registrada</Text>
+              </View>
+            ) : meuHistorico.map(h => (
+              <View key={h.id} style={s.loanCard}>
+                {h.capa ? (
+                  <Image source={{ uri: h.capa }} style={s.loanCover} resizeMode="cover" />
+                ) : (
+                  <View style={[s.loanCover, { backgroundColor: CORES.muted }]} />
+                )}
+                <View style={s.loanInfo}>
+                  <Text style={s.loanTitle}>{h.livroTitulo || `Livro #${h.livroId}`}</Text>
+                  <Text style={s.loanAuthor}>{h.livroAutor || '—'}</Text>
+                  {h.dataDevolucao ? (
+                    <Text style={[s.loanAuthor, { marginTop: 4 }]}>
+                      Devolvido em {new Date(h.dataDevolucao).toLocaleDateString('pt-BR')}
+                    </Text>
+                  ) : null}
                 </View>
               </View>
+            ))}
+          </View>
+        </ScrollView>
+      );
+    };
+
+    const renderRankingProfessor = () => {
+      const ranking = usuariosAdmin
+        .filter(u => u.perfil === 'aluno')
+        .map(u => ({
+          ...u,
+          total: emprestimosEscola.filter(e => e.usuarioId === u.id).length,
+        }))
+        .filter(u => u.total > 0)
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 20);
+
+      const medalhas = ['🥇', '🥈', '🥉'];
+
+      return (
+        <ScrollView style={{ flex: 1 }}>
+          <View style={s.homeHeader}>
+            <View>
+              <Text style={s.homeGreeting}>Ranking de Leitores</Text>
+              <Text style={s.homeName}>{ranking.length} aluno(s) com leituras</Text>
             </View>
-          ))}
-        </View>
-      </ScrollView>
-    );
+          </View>
+          <View style={{ padding: 16, gap: 10 }}>
+            <Text style={s.sectionLabel}>🏆 ALUNOS MAIS LEITORES DA ESCOLA</Text>
+            {carregando ? (
+              <ActivityIndicator color={CORES.amber} size="large" style={{ marginTop: 40 }} />
+            ) : ranking.length === 0 ? (
+              <View style={s.emptyBox}>
+                <Text style={s.emptyText}>Nenhum empréstimo registrado ainda</Text>
+              </View>
+            ) : ranking.map((aluno, index) => (
+              <View key={aluno.id} style={[s.loanCard, index < 3 && { borderColor: CORES.amber, borderWidth: 1.5 }]}>
+                <View style={{
+                  width: 44, height: 44, borderRadius: 22,
+                  backgroundColor: index < 3 ? CORES.amber : CORES.warm,
+                  alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Text style={{ fontSize: index < 3 ? 22 : 16, fontWeight: '700', color: CORES.ink }}>
+                    {index < 3 ? medalhas[index] : `${index + 1}º`}
+                  </Text>
+                </View>
+                <View style={s.loanInfo}>
+                  <Text style={s.loanTitle}>{aluno.nome}</Text>
+                  {aluno.turma ? (
+                    <Text style={s.loanAuthor}>Turma {aluno.turma}</Text>
+                  ) : null}
+                  <View style={[s.badgeSmall, { backgroundColor: 'rgba(201,123,46,0.12)', marginTop: 4 }]}>
+                    <Text style={[s.badgeText, { color: CORES.amber }]}>
+                      📚 {aluno.total} {aluno.total === 1 ? 'livro lido' : 'livros lidos'}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            ))}
+            {ranking.length > 0 && (
+              <Text style={[s.loanAuthor, { textAlign: 'center', marginTop: 8, color: CORES.muted }]}>
+                Baseado no total de empréstimos registrados
+              </Text>
+            )}
+          </View>
+        </ScrollView>
+      );
+    };
 
     const renderPerfilProfessor = () => (
       <ScrollView style={{ flex: 1 }}>
@@ -2811,7 +2952,8 @@ export default function App() {
     const abasProfessor = [
       { key: 'home', icon: '🏠', label: 'Início' },
       { key: 'buscar', icon: '🔍', label: 'Explorar' },
-      { key: 'turma', icon: '👥', label: 'Turma' },
+      { key: 'reservas', icon: '📋', label: 'Reservas' },
+      { key: 'ranking', icon: '🏆', label: 'Ranking' },
       { key: 'avisos', icon: '🔔', label: 'Avisos' },
       { key: 'perfil', icon: '👤', label: 'Perfil' },
     ];
@@ -2823,7 +2965,8 @@ export default function App() {
           {abaProfessor === 'home' && livroSelecionado && renderDetalhe()}
           {abaProfessor === 'buscar' && !livroSelecionado && renderBusca()}
           {abaProfessor === 'buscar' && livroSelecionado && renderDetalhe()}
-          {abaProfessor === 'turma' && renderTurmaProfessor()}
+          {abaProfessor === 'reservas' && renderReservasProfessor()}
+          {abaProfessor === 'ranking' && renderRankingProfessor()}
           {abaProfessor === 'avisos' && renderNotificacoes()}
           {abaProfessor === 'perfil' && renderPerfilProfessor()}
         </View>
