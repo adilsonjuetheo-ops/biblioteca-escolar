@@ -1199,7 +1199,11 @@ export default function App() {
           <TouchableOpacity onPress={() => setTela('login')} style={s.voltarBtn}>
             <Text style={s.voltarText}>← Voltar</Text>
           </TouchableOpacity>
-          <Text style={s.paginaTitulo}>Cadastro de professor</Text>
+          <Text style={s.paginaTitulo}>
+            {profCargo === 'bibliotecario' ? 'Cadastro de bibliotecário' :
+             profCargo === 'coordenacao'   ? 'Cadastro de coordenação'   :
+             'Cadastro de professor'}
+          </Text>
           <Text style={s.paginaSub}>📖 Professores e bibliotecários · {DOMINIO_PROFESSOR}</Text>
           <Text style={s.label}>Nome completo *</Text>
           <TextInput style={s.input} placeholder="Seu nome completo"
