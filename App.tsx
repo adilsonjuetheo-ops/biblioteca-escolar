@@ -2746,9 +2746,6 @@ export default function App() {
             ) : meusAtivos.length === 0 ? (
               <View style={s.emptyBox}>
                 <Text style={s.emptyText}>Nenhum empréstimo ativo</Text>
-                <Text style={{ fontSize: 10, color: CORES.muted, marginTop: 4 }}>
-                  {`debug | uid: ${String(usuario?.id ?? 'UNDEFINED').slice(0,12)} | ativos: ${emprestimosAtivos.length} | escola: ${emprestimosEscola.length}`}
-                </Text>
               </View>
             ) : meusAtivos.map(emp => {
               const hoje = new Date();
