@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 const { readDb, writeDb } = require('./db');
 const { sendRecoveryCode } = require('./mailer');
@@ -14,6 +15,46 @@ const DOMINIO_ALUNO = '@aluno.mg.gov.br';
 const DOMINIO_PROFESSOR = '@educacao.mg.gov.br';
 const RECOVERY_EXP_MINUTES = 15;
 const MIN_SECONDS_BETWEEN_CODES = 60;
+const JWT_SECRET = process.env.JWT_SECRET || (() => {
+  if (String(process.env.NODE_ENV).toLowerCase() === 'production') {
+    throw new Error('JWT_SECRET nao configurado. Defina a variavel de ambiente JWT_SECRET em producao.');
+  }
+  console.warn('[AVISO] JWT_SECRET nao definido. Usando segredo temporario — nao use em producao!');
+  return 'dev-secret-inseguro-trocar-em-producao';
+})();
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '8h';
+
+// ── Rate limiting simples em memória para login ───────────────────────────────
+const loginAttempts = new Map();
+const MAX_LOGIN_ATTEMPTS = 10;
+const LOGIN_BLOCK_MINUTES = 15;
+
+function checkLoginRateLimit(ip) {
+  const now = Date.now();
+  const record = loginAttempts.get(ip) || { count: 0, blockedUntil: 0 };
+  if (record.blockedUntil > now) {
+    const restanteMin = Math.ceil((record.blockedUntil - now) / 60000);
+    return { bloqueado: true, restanteMin };
+  }
+  return { bloqueado: false, record };
+}
+
+function registrarFalhaLogin(ip) {
+  const now = Date.now();
+  const record = loginAttempts.get(ip) || { count: 0, blockedUntil: 0 };
+  record.count += 1;
+  if (record.count >= MAX_LOGIN_ATTEMPTS) {
+    record.blockedUntil = now + LOGIN_BLOCK_MINUTES * 60 * 1000;
+    record.count = 0;
+  }
+  loginAttempts.set(ip, record);
+}
+
+function limparFalhasLogin(ip) {
+  loginAttempts.delete(ip);
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function normalizeEmail(email) {
   return String(email || '').trim().toLowerCase();
@@ -28,7 +69,8 @@ function hashCode(code) {
 }
 
 function createCode() {
-  return String(Math.floor(100000 + Math.random() * 900000));
+  // crypto.randomInt é criptograficamente seguro (substitui Math.random)
+  return String(crypto.randomInt(100000, 1000000));
 }
 
 function createPickupQrCode() {
@@ -39,7 +81,7 @@ function createId() {
   if (crypto.randomUUID) {
     return crypto.randomUUID();
   }
-  return `${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+  return `${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
 }
 
 function toPublicUser(usuario) {
@@ -63,11 +105,11 @@ function normalizeLivroPayload(payload = {}) {
   const disponiveis = Math.min(totalExemplares, Math.max(0, Number(disponiveisRaw) || 0));
 
   return {
-    titulo: String(payload.titulo || '').trim(),
-    autor: String(payload.autor || '').trim(),
-    genero: String(payload.genero || '').trim(),
-    capa: String(payload.capa || '').trim(),
-    sinopse: String(payload.sinopse || '').trim(),
+    titulo: String(payload.titulo || '').trim().slice(0, 200),
+    autor: String(payload.autor || '').trim().slice(0, 200),
+    genero: String(payload.genero || '').trim().slice(0, 100),
+    capa: String(payload.capa || '').trim().slice(0, 500),
+    sinopse: String(payload.sinopse || '').trim().slice(0, 2000),
     totalExemplares,
     disponiveis,
   };
@@ -96,6 +138,36 @@ function parseAllowedOrigins() {
     .filter(Boolean);
 }
 
+// ── Middlewares de autenticação e autorização ─────────────────────────────────
+
+function verifyToken(req, res, next) {
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith('Bearer ')) {
+    res.status(401).json({ erro: 'Token de autenticacao ausente.' });
+    return;
+  }
+  try {
+    const token = auth.slice(7);
+    const payload = jwt.verify(token, JWT_SECRET);
+    req.usuario = payload;
+    next();
+  } catch {
+    res.status(401).json({ erro: 'Token invalido ou expirado. Faca login novamente.' });
+  }
+}
+
+function requirePerfil(...perfis) {
+  return (req, res, next) => {
+    if (!perfis.includes(req.usuario?.perfil)) {
+      res.status(403).json({ erro: 'Acesso nao autorizado para este perfil.' });
+      return;
+    }
+    next();
+  };
+}
+
+// ── CORS e body parser ────────────────────────────────────────────────────────
+
 const allowedOrigins = parseAllowedOrigins();
 app.use(
   cors({
@@ -113,14 +185,18 @@ app.use(
   })
 );
 
-app.use(express.json());
+app.use(express.json({ limit: '256kb' }));
+
+// ── Rotas públicas ────────────────────────────────────────────────────────────
 
 app.get('/health', (_, res) => {
   res.json({ ok: true, service: 'biblioteca-api' });
 });
 
+// Cadastro — perfil restrito a 'aluno' e 'professor' (nunca 'bibliotecario')
 app.post('/usuarios', async (req, res) => {
-  const { nome, email, senha, perfil = 'aluno', matricula = '', turma = '' } = req.body || {};
+  const { nome, email, senha, matricula = '', turma = '' } = req.body || {};
+  // O perfil é determinado pelo domínio do e-mail, não pelo cliente
   const emailNormalizado = normalizeEmail(email);
 
   if (!nome || !emailNormalizado || !senha) {
@@ -130,6 +206,15 @@ app.post('/usuarios', async (req, res) => {
 
   if (!isEmailEscolar(emailNormalizado)) {
     res.status(400).json({ erro: 'Use um e-mail escolar institucional valido.' });
+    return;
+  }
+
+  // Perfil é derivado do domínio — cliente não controla
+  const perfil = emailNormalizado.endsWith(DOMINIO_ALUNO) ? 'aluno' : 'professor';
+
+  const nomeStr = String(nome).trim().slice(0, 150);
+  if (!nomeStr) {
+    res.status(400).json({ erro: 'Nome invalido.' });
     return;
   }
 
@@ -148,38 +233,23 @@ app.post('/usuarios', async (req, res) => {
   const senhaHash = await bcrypt.hash(String(senha), 10);
   const novoUsuario = {
     id: createId(),
-    nome: String(nome).trim(),
+    nome: nomeStr,
     email: emailNormalizado,
     senhaHash,
-    perfil: String(perfil),
-    matricula: String(matricula || ''),
-    turma: String(turma || ''),
+    perfil,
+    matricula: String(matricula || '').slice(0, 50),
+    turma: String(turma || '').slice(0, 50),
     criadoEm: new Date().toISOString(),
   };
 
   db.usuarios.push(novoUsuario);
   await writeDb(db);
 
-  res.status(201).json({
-    id: novoUsuario.id,
-    nome: novoUsuario.nome,
-    email: novoUsuario.email,
-    perfil: novoUsuario.perfil,
-    matricula: novoUsuario.matricula,
-    turma: novoUsuario.turma,
-  });
-});
-
-app.get('/usuarios', async (req, res) => {
-  const perfilFiltro = String(req.query.perfil || '').trim();
-  const db = await readDb();
-  const usuarios = db.usuarios
-    .filter((u) => !perfilFiltro || u.perfil === perfilFiltro)
-    .map(toPublicUser);
-  res.json(usuarios);
+  res.status(201).json(toPublicUser(novoUsuario));
 });
 
 app.post('/usuarios/login', async (req, res) => {
+  const ip = req.ip || 'unknown';
   const { email, senha } = req.body || {};
   const emailNormalizado = normalizeEmail(email);
 
@@ -188,27 +258,39 @@ app.post('/usuarios/login', async (req, res) => {
     return;
   }
 
+  // Verificação de rate limit por IP
+  const rateCheck = checkLoginRateLimit(ip);
+  if (rateCheck.bloqueado) {
+    res.status(429).json({
+      erro: `Muitas tentativas de login. Tente novamente em ${rateCheck.restanteMin} minuto(s).`,
+    });
+    return;
+  }
+
   const db = await readDb();
   const usuario = db.usuarios.find((u) => u.email === emailNormalizado);
   if (!usuario) {
+    registrarFalhaLogin(ip);
     res.status(401).json({ erro: 'E-mail ou senha incorretos.' });
     return;
   }
 
   const ok = await bcrypt.compare(String(senha), usuario.senhaHash);
   if (!ok) {
+    registrarFalhaLogin(ip);
     res.status(401).json({ erro: 'E-mail ou senha incorretos.' });
     return;
   }
 
-  res.json({
-    id: usuario.id,
-    nome: usuario.nome,
-    email: usuario.email,
-    perfil: usuario.perfil,
-    matricula: usuario.matricula,
-    turma: usuario.turma,
-  });
+  limparFalhasLogin(ip);
+
+  const token = jwt.sign(
+    { id: usuario.id, email: usuario.email, perfil: usuario.perfil },
+    JWT_SECRET,
+    { expiresIn: JWT_EXPIRES_IN }
+  );
+
+  res.json({ ...toPublicUser(usuario), token });
 });
 
 app.post('/usuarios/recuperar-senha', async (req, res) => {
@@ -322,12 +404,16 @@ app.post('/usuarios/redefinir-senha', async (req, res) => {
   res.json({ mensagem: 'Senha redefinida com sucesso.' });
 });
 
-app.get('/livros', async (_, res) => {
+// ── Rotas de livros ───────────────────────────────────────────────────────────
+
+// Catálogo: qualquer usuário autenticado pode visualizar
+app.get('/livros', verifyToken, async (_, res) => {
   const db = await readDb();
   res.json(db.livros);
 });
 
-app.post('/livros', async (req, res) => {
+// Adicionar livro: somente bibliotecario
+app.post('/livros', verifyToken, requirePerfil('bibliotecario'), async (req, res) => {
   const livro = normalizeLivroPayload(req.body || {});
 
   if (!livro.titulo) {
@@ -370,7 +456,8 @@ app.post('/livros', async (req, res) => {
   res.status(201).json(novoLivro);
 });
 
-app.patch('/livros/:id', async (req, res) => {
+// Editar livro: somente bibliotecario
+app.patch('/livros/:id', verifyToken, requirePerfil('bibliotecario'), async (req, res) => {
   const { id } = req.params;
   const db = await readDb();
   const livro = db.livros.find((l) => l.id === id);
@@ -395,7 +482,8 @@ app.patch('/livros/:id', async (req, res) => {
   res.json(livro);
 });
 
-app.delete('/livros/:id', async (req, res) => {
+// Remover livro: somente bibliotecario
+app.delete('/livros/:id', verifyToken, requirePerfil('bibliotecario'), async (req, res) => {
   const { id } = req.params;
   const db = await readDb();
 
@@ -419,16 +507,39 @@ app.delete('/livros/:id', async (req, res) => {
   res.status(204).end();
 });
 
-app.get('/emprestimos', async (_, res) => {
+// ── Rotas de usuários (admin) ─────────────────────────────────────────────────
+
+// Listar usuários: somente bibliotecario e professor
+app.get('/usuarios', verifyToken, requirePerfil('bibliotecario', 'professor'), async (req, res) => {
+  const perfilFiltro = String(req.query.perfil || '').trim();
   const db = await readDb();
-  res.json(db.emprestimos);
+  const usuarios = db.usuarios
+    .filter((u) => !perfilFiltro || u.perfil === perfilFiltro)
+    .map(toPublicUser);
+  res.json(usuarios);
 });
 
-app.post('/emprestimos', async (req, res) => {
-  const { usuarioId, livroId } = req.body || {};
+// ── Rotas de empréstimos ──────────────────────────────────────────────────────
 
-  if (!usuarioId || !livroId) {
-    res.status(400).json({ erro: 'usuarioId e livroId sao obrigatorios.' });
+// Listar: bibliotecario/professor veem todos; aluno vê só os seus
+app.get('/emprestimos', verifyToken, async (req, res) => {
+  const db = await readDb();
+  const { perfil, id } = req.usuario;
+  if (perfil === 'bibliotecario' || perfil === 'professor') {
+    res.json(db.emprestimos);
+  } else {
+    res.json(db.emprestimos.filter((e) => e.usuarioId === id));
+  }
+});
+
+// Criar reserva: aluno/professor podem reservar apenas para si mesmos
+app.post('/emprestimos', verifyToken, async (req, res) => {
+  const { livroId } = req.body || {};
+  // usuarioId sempre vem do token — cliente não controla
+  const usuarioId = req.usuario.id;
+
+  if (!livroId) {
+    res.status(400).json({ erro: 'livroId e obrigatorio.' });
     return;
   }
 
@@ -479,9 +590,9 @@ app.post('/emprestimos', async (req, res) => {
   res.status(201).json(novoEmprestimo);
 });
 
-app.post('/emprestimos/:id/qr-retirada', async (req, res) => {
+// Gerar QR de retirada: dono do empréstimo ou bibliotecario
+app.post('/emprestimos/:id/qr-retirada', verifyToken, async (req, res) => {
   const { id } = req.params;
-  const { usuarioId } = req.body || {};
   const db = await readDb();
   const emprestimo = db.emprestimos.find((e) => e.id === id);
 
@@ -495,7 +606,9 @@ app.post('/emprestimos/:id/qr-retirada', async (req, res) => {
     return;
   }
 
-  if (usuarioId && emprestimo.usuarioId !== usuarioId) {
+  // Apenas o dono do empréstimo ou bibliotecario pode gerar o QR
+  const { id: reqId, perfil } = req.usuario;
+  if (perfil !== 'bibliotecario' && emprestimo.usuarioId !== reqId) {
     res.status(403).json({ erro: 'Voce nao pode gerar QR para este emprestimo.' });
     return;
   }
@@ -522,7 +635,8 @@ app.post('/emprestimos/:id/qr-retirada', async (req, res) => {
   });
 });
 
-app.patch('/emprestimos/retirada-qr', async (req, res) => {
+// Confirmar retirada por QR: somente bibliotecario
+app.patch('/emprestimos/retirada-qr', verifyToken, requirePerfil('bibliotecario'), async (req, res) => {
   const codigoOuPayload = String(req.body?.codigo || '').trim();
 
   if (!codigoOuPayload) {
@@ -562,7 +676,8 @@ app.patch('/emprestimos/retirada-qr', async (req, res) => {
   });
 });
 
-app.patch('/emprestimos/:id/retirar', async (req, res) => {
+// Retirada manual: somente bibliotecario
+app.patch('/emprestimos/:id/retirar', verifyToken, requirePerfil('bibliotecario'), async (req, res) => {
   const { id } = req.params;
   const db = await readDb();
   const emprestimo = db.emprestimos.find((e) => e.id === id);
@@ -584,7 +699,8 @@ app.patch('/emprestimos/:id/retirar', async (req, res) => {
   res.json(emprestimo);
 });
 
-app.patch('/emprestimos/:id/renovar', async (req, res) => {
+// Renovar: dono do empréstimo ou bibliotecario
+app.patch('/emprestimos/:id/renovar', verifyToken, async (req, res) => {
   const { id } = req.params;
   const db = await readDb();
   const emprestimo = db.emprestimos.find((e) => e.id === id);
@@ -593,6 +709,13 @@ app.patch('/emprestimos/:id/renovar', async (req, res) => {
     res.status(404).json({ erro: 'Emprestimo nao encontrado.' });
     return;
   }
+
+  const { id: reqId, perfil } = req.usuario;
+  if (perfil !== 'bibliotecario' && emprestimo.usuarioId !== reqId) {
+    res.status(403).json({ erro: 'Voce nao pode renovar este emprestimo.' });
+    return;
+  }
+
   if (emprestimo.status === 'devolvido') {
     res.status(409).json({ erro: 'Emprestimo ja devolvido.' });
     return;
@@ -608,7 +731,8 @@ app.patch('/emprestimos/:id/renovar', async (req, res) => {
   res.json(emprestimo);
 });
 
-app.patch('/emprestimos/:id/devolver', async (req, res) => {
+// Devolver: somente bibliotecario
+app.patch('/emprestimos/:id/devolver', verifyToken, requirePerfil('bibliotecario'), async (req, res) => {
   const { id } = req.params;
   const db = await readDb();
   const emprestimo = db.emprestimos.find((e) => e.id === id);
@@ -638,16 +762,20 @@ app.patch('/emprestimos/:id/devolver', async (req, res) => {
   res.json(emprestimo);
 });
 
-app.get('/avaliacoes', async (_, res) => {
+// ── Rotas de avaliações ───────────────────────────────────────────────────────
+
+app.get('/avaliacoes', verifyToken, async (_, res) => {
   const db = await readDb();
   res.json(db.avaliacoes || []);
 });
 
-app.post('/avaliacoes', async (req, res) => {
-  const { usuarioId, livroId, nota, resenha = '' } = req.body || {};
+app.post('/avaliacoes', verifyToken, async (req, res) => {
+  const { livroId, nota, resenha = '' } = req.body || {};
+  // usuarioId sempre vem do token
+  const usuarioId = req.usuario.id;
 
-  if (!usuarioId || !livroId || nota == null) {
-    res.status(400).json({ erro: 'usuarioId, livroId e nota sao obrigatorios.' });
+  if (!livroId || nota == null) {
+    res.status(400).json({ erro: 'livroId e nota sao obrigatorios.' });
     return;
   }
 
@@ -703,21 +831,32 @@ app.post('/avaliacoes', async (req, res) => {
   res.status(201).json(novaAvaliacao);
 });
 
-app.get('/desejos', async (req, res) => {
-  const { usuarioId } = req.query;
+// ── Rotas de lista de desejos ─────────────────────────────────────────────────
+
+// Listar: aluno vê só os seus; bibliotecario/professor podem filtrar por usuário
+app.get('/desejos', verifyToken, async (req, res) => {
+  const { id: reqId, perfil } = req.usuario;
   const db = await readDb();
-  const lista = (db.desejos || []).filter((d) =>
-    !usuarioId || d.usuarioId === usuarioId
-  );
+  const lista = (db.desejos || []).filter((d) => {
+    if (perfil === 'bibliotecario' || perfil === 'professor') {
+      return !req.query.usuarioId || d.usuarioId === req.query.usuarioId;
+    }
+    return d.usuarioId === reqId;
+  });
   res.json(lista);
 });
 
-app.post('/desejos', async (req, res) => {
-  const { usuarioId, livroId } = req.body || {};
-  if (!usuarioId || !livroId) {
-    res.status(400).json({ erro: 'usuarioId e livroId sao obrigatorios.' });
+// Adicionar: usuário só pode adicionar na própria lista
+app.post('/desejos', verifyToken, async (req, res) => {
+  const { livroId } = req.body || {};
+  // usuarioId sempre vem do token
+  const usuarioId = req.usuario.id;
+
+  if (!livroId) {
+    res.status(400).json({ erro: 'livroId e obrigatorio.' });
     return;
   }
+
   const db = await readDb();
   if (!db.desejos) db.desejos = [];
 
@@ -745,16 +884,28 @@ app.post('/desejos', async (req, res) => {
   res.status(201).json(novo);
 });
 
-app.delete('/desejos/:id', async (req, res) => {
+// Remover: somente o dono ou bibliotecario
+app.delete('/desejos/:id', verifyToken, async (req, res) => {
   const { id } = req.params;
+  const { id: reqId, perfil } = req.usuario;
   const db = await readDb();
   if (!db.desejos) db.desejos = [];
+
   const idx = db.desejos.findIndex((d) => d.id === id);
   if (idx === -1) { res.status(404).json({ erro: 'Item nao encontrado.' }); return; }
+
+  const desejo = db.desejos[idx];
+  if (perfil !== 'bibliotecario' && desejo.usuarioId !== reqId) {
+    res.status(403).json({ erro: 'Voce nao pode remover este item.' });
+    return;
+  }
+
   db.desejos.splice(idx, 1);
   await writeDb(db);
   res.status(204).end();
 });
+
+// ── Error handler ─────────────────────────────────────────────────────────────
 
 app.use((err, _req, res, _next) => {
   console.error(err);

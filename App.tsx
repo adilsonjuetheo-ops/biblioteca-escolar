@@ -486,7 +486,7 @@ export default function App() {
     try {
       const { data } = await axios.post(`${API_URL}/usuarios`, {
         nome: cadNome, email: cadEmail, senha: cadSenha,
-        matricula: cadMatricula, turma: cadTurma, perfil: 'aluno',
+        matricula: cadMatricula, turma: cadTurma,
       });
       Alert.alert('Cadastro realizado!', `Bem-vindo(a), ${data.nome}!`, [
         { text: 'Fazer login', onPress: () => {
@@ -513,7 +513,7 @@ export default function App() {
     try {
       const { data } = await axios.post(`${API_URL}/usuarios`, {
         nome: profNome, email: profEmail, senha: profSenha,
-        matricula: profDisciplina, perfil: profCargo,
+        matricula: profDisciplina,
       });
       Alert.alert('Cadastro realizado!', `Professor(a) ${data.nome} cadastrado(a)!`, [
         { text: 'Fazer login', onPress: () => {
@@ -546,7 +546,7 @@ export default function App() {
       Alert.alert('Indisponível', 'Sem exemplares disponíveis.'); return;
     }
     try {
-      await axios.post(`${API_URL}/emprestimos`, { usuarioId: usuario.id, livroId: livro.id });
+      await axios.post(`${API_URL}/emprestimos`, { livroId: livro.id });
       Alert.alert('Reserva confirmada!', `"${livro.titulo}" reservado!`);
       await carregarDados();
       setLivroSelecionado(null);
@@ -567,9 +567,7 @@ export default function App() {
   async function handleGerarQrRetirada(emp: Emprestimo) {
     setGerandoQrRetirada(true);
     try {
-      const { data } = await axios.post(`${API_URL}/emprestimos/${emp.id}/qr-retirada`, {
-        usuarioId: usuario?.id,
-      });
+      const { data } = await axios.post(`${API_URL}/emprestimos/${emp.id}/qr-retirada`, {});
       setEmprestimoQrAtual(emp);
       setDadosQrRetirada(data);
       setTelaQrRetirada(true);
@@ -816,7 +814,6 @@ export default function App() {
     setEnviandoResenha(true);
     try {
       await axios.post(`${API_URL}/avaliacoes`, {
-        usuarioId: usuario.id,
         livroId: livroParaResenhar?.livroId,
         nota: notaResenha,
         resenha: textoResenha,
@@ -846,7 +843,6 @@ export default function App() {
         setDesejos(prev => prev.filter(d => d.id !== existente.id));
       } else {
         const { data } = await axios.post(`${API_URL}/desejos`, {
-          usuarioId: usuario.id,
           livroId: livro.id,
         });
         setDesejos(prev => [...prev, data]);
@@ -1380,7 +1376,6 @@ export default function App() {
                   if (!usuario) return;
                   try {
                     await axios.post(`${API_URL}/desejos`, {
-                      usuarioId: usuario.id,
                       livroId: livroSelecionado?.id,
                     });
                     Alert.alert('Fila de espera', 'Você foi adicionado à lista de desejos! Será avisado quando disponível.');
@@ -1463,13 +1458,84 @@ export default function App() {
         </View>
       </View>
       <View style={{ padding: 16, gap: 12 }}>
-        <View style={s.searchBar}>
-          <Text style={{ fontSize: 14, marginRight: 6 }}>🔍</Text>
-          <Text style={s.searchPlaceholder}>Buscar livros, autores...</Text>
-        </View>
-        <TouchableOpacity style={s.btnSecundario} onPress={() => carregarDados()}>
-          <Text style={s.btnSecundarioText}>↻  Atualizar acervo</Text>
-        </TouchableOpacity>
+        {(() => {
+          // Calcula destaques: livros com mais empréstimos + melhor avaliação
+          const contagemEmprestimos = emprestimosAtivos.concat(historico).reduce((acc, emp) => {
+            if (emp.livroId) acc[emp.livroId] = (acc[emp.livroId] || 0) + 1;
+            return acc;
+          }, {} as Record<string, number>);
+
+          const mediaAvaliacoes = todasAvaliacoes.reduce((acc, av) => {
+            if (!acc[av.livroId]) acc[av.livroId] = { soma: 0, total: 0 };
+            acc[av.livroId].soma += av.nota;
+            acc[av.livroId].total += 1;
+            return acc;
+          }, {} as Record<string, { soma: number; total: number }>);
+
+          const destaques = livros
+            .filter(l => l.disponiveis > 0)
+            .map(l => ({
+              ...l,
+              score: (contagemEmprestimos[l.id] || 0) * 2 +
+                (mediaAvaliacoes[l.id] ? mediaAvaliacoes[l.id].soma / mediaAvaliacoes[l.id].total : 0),
+              media: mediaAvaliacoes[l.id]
+                ? (mediaAvaliacoes[l.id].soma / mediaAvaliacoes[l.id].total).toFixed(1)
+                : null,
+              emprestimos: contagemEmprestimos[l.id] || 0,
+            }))
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 6);
+
+          if (destaques.length === 0) return null;
+
+          return (
+            <>
+              <Text style={s.sectionLabel}>🔥 DESTAQUES DA SEMANA</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -16, paddingHorizontal: 16 }}>
+                <View style={{ flexDirection: 'row', gap: 12, paddingRight: 16 }}>
+                  {destaques.map((livro, index) => (
+                    <TouchableOpacity
+                      key={livro.id}
+                      onPress={() => setLivroSelecionado(livro)}
+                      style={{
+                        width: 130,
+                        backgroundColor: CORES.card,
+                        borderRadius: 14,
+                        borderWidth: 1,
+                        borderColor: CORES.border,
+                        overflow: 'hidden',
+                      }}>
+                      {livro.capa ? (
+                        <Image source={{ uri: livro.capa }} style={{ width: 130, height: 90 }} resizeMode="cover" />
+                      ) : (
+                        <View style={{ width: 130, height: 90, backgroundColor: index % 2 === 0 ? CORES.ink : CORES.sage, alignItems: 'center', justifyContent: 'center' }}>
+                          <Text style={{ fontSize: 32 }}>📚</Text>
+                        </View>
+                      )}
+                      <View style={{ padding: 8 }}>
+                        {index === 0 && (
+                          <View style={{ backgroundColor: 'rgba(201,123,46,0.15)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, alignSelf: 'flex-start', marginBottom: 4 }}>
+                            <Text style={{ fontSize: 10, fontWeight: '700', color: CORES.amber }}>🔥 #1 Em alta</Text>
+                          </View>
+                        )}
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: CORES.ink }} numberOfLines={2}>{livro.titulo}</Text>
+                        <Text style={{ fontSize: 11, color: CORES.muted, marginTop: 2 }} numberOfLines={1}>{livro.autor}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                          {livro.media && (
+                            <Text style={{ fontSize: 10, color: CORES.amber, fontWeight: '700' }}>★ {livro.media}</Text>
+                          )}
+                          {livro.emprestimos > 0 && (
+                            <Text style={{ fontSize: 10, color: CORES.muted }}>{livro.emprestimos} emp.</Text>
+                          )}
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
+            </>
+          );
+        })()}
         {erroConexao && (
           <View style={[s.emptyBox, { borderColor: CORES.rust, borderWidth: 1, marginBottom: 8 }]}>
             <Text style={[s.emptyText, { color: CORES.rust }]}>⚠️  Sem conexão com o servidor.{`\n`}Verifique o Wi-Fi e toque em Atualizar acervo.</Text>
@@ -2522,12 +2588,85 @@ export default function App() {
           </View>
         </View>
         <View style={{ padding: 16, gap: 12 }}>
-          <View style={s.searchBar}>
-            <Text style={{ fontSize: 14, marginRight: 6 }}>🔍</Text>
-            <Text style={s.searchPlaceholder}>Buscar livros, autores...</Text>
-          </View>
           {carregando ? <ActivityIndicator color={CORES.amber} size="large" style={{ marginTop: 40 }} /> : (
             <>
+              {(() => {
+                const contagemEmprestimos = emprestimosAtivos.concat(historico).reduce((acc, emp) => {
+                  if (emp.livroId) acc[emp.livroId] = (acc[emp.livroId] || 0) + 1;
+                  return acc;
+                }, {} as Record<string, number>);
+
+                const mediaAvaliacoes = todasAvaliacoes.reduce((acc, av) => {
+                  if (!acc[av.livroId]) acc[av.livroId] = { soma: 0, total: 0 };
+                  acc[av.livroId].soma += av.nota;
+                  acc[av.livroId].total += 1;
+                  return acc;
+                }, {} as Record<string, { soma: number; total: number }>);
+
+                const destaques = livros
+                  .filter(l => l.disponiveis > 0)
+                  .map(l => ({
+                    ...l,
+                    score: (contagemEmprestimos[l.id] || 0) * 2 +
+                      (mediaAvaliacoes[l.id] ? mediaAvaliacoes[l.id].soma / mediaAvaliacoes[l.id].total : 0),
+                    media: mediaAvaliacoes[l.id]
+                      ? (mediaAvaliacoes[l.id].soma / mediaAvaliacoes[l.id].total).toFixed(1)
+                      : null,
+                    emprestimos: contagemEmprestimos[l.id] || 0,
+                  }))
+                  .sort((a, b) => b.score - a.score)
+                  .slice(0, 6);
+
+                if (destaques.length === 0) return null;
+
+                return (
+                  <>
+                    <Text style={s.sectionLabel}>🔥 DESTAQUES DA SEMANA</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -16, paddingHorizontal: 16 }}>
+                      <View style={{ flexDirection: 'row', gap: 12, paddingRight: 16 }}>
+                        {destaques.map((livro, index) => (
+                          <TouchableOpacity
+                            key={livro.id}
+                            onPress={() => setLivroSelecionado(livro)}
+                            style={{
+                              width: 130,
+                              backgroundColor: CORES.card,
+                              borderRadius: 14,
+                              borderWidth: 1,
+                              borderColor: CORES.border,
+                              overflow: 'hidden',
+                            }}>
+                            {livro.capa ? (
+                              <Image source={{ uri: livro.capa }} style={{ width: 130, height: 90 }} resizeMode="cover" />
+                            ) : (
+                              <View style={{ width: 130, height: 90, backgroundColor: index % 2 === 0 ? CORES.ink : CORES.sage, alignItems: 'center', justifyContent: 'center' }}>
+                                <Text style={{ fontSize: 32 }}>📚</Text>
+                              </View>
+                            )}
+                            <View style={{ padding: 8 }}>
+                              {index === 0 && (
+                                <View style={{ backgroundColor: 'rgba(201,123,46,0.15)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, alignSelf: 'flex-start', marginBottom: 4 }}>
+                                  <Text style={{ fontSize: 10, fontWeight: '700', color: CORES.amber }}>🔥 #1 Em alta</Text>
+                                </View>
+                              )}
+                              <Text style={{ fontSize: 12, fontWeight: '700', color: CORES.ink }} numberOfLines={2}>{livro.titulo}</Text>
+                              <Text style={{ fontSize: 11, color: CORES.muted, marginTop: 2 }} numberOfLines={1}>{livro.autor}</Text>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                                {livro.media && (
+                                  <Text style={{ fontSize: 10, color: CORES.amber, fontWeight: '700' }}>★ {livro.media}</Text>
+                                )}
+                                {livro.emprestimos > 0 && (
+                                  <Text style={{ fontSize: 10, color: CORES.muted }}>{livro.emprestimos} emp.</Text>
+                                )}
+                              </View>
+                            </View>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </ScrollView>
+                  </>
+                );
+              })()}
               {emprestimosAtivos.length > 0 && (
                 <>
                   <Text style={s.sectionLabel}>MEUS EMPRÉSTIMOS ATIVOS</Text>
