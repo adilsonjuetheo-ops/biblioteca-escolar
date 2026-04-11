@@ -2474,7 +2474,11 @@ export default function App() {
                   Alert.alert('Reparo concluído', data.mensagem);
                   await carregarDados();
                 } catch (err) {
-                  Alert.alert('Erro', getApiErrorMessage(err, 'Não foi possível reparar os dados.'));
+                  const status = axios.isAxiosError(err) ? err.response?.status : null;
+                  const msg = axios.isAxiosError(err)
+                    ? (err.response?.data?.erro || JSON.stringify(err.response?.data) || err.message)
+                    : String(err);
+                  Alert.alert('Erro', `[${status ?? 'sem resposta'}] ${msg}`);
                 } finally {
                   setReparando(false);
                 }
