@@ -355,6 +355,7 @@ export default function App() {
     sinopse?: string; totalExemplares: number; capa?: string;
   } | null>(null);
   const [salvandoScan, setSalvandoScan] = useState(false);
+  const [reparando, setReparando] = useState(false);
 
   const saudacaoPorHorario = (() => {
     const hora = Number(
@@ -2455,7 +2456,37 @@ export default function App() {
             <Text style={s.btnSecundarioText}>Atualizar dados do painel</Text>
           </TouchableOpacity>
 
-          <Text style={s.sectionLabel}>USUÁRIOS CADASTRADOS</Text>
+          <Text style={s.sectionLabel}>MANUTENÇÃO DE DADOS</Text>
+          <View style={s.qrValidationBox}>
+            <Text style={[s.loanAuthor, { textAlign: 'center', marginBottom: 12 }]}>
+              🔧 Remove empréstimos sem usuário vinculado (dados corrompidos) e devolve os exemplares ao acervo.
+            </Text>
+            <TouchableOpacity
+              style={[s.btnPrimary, { backgroundColor: CORES.rust, opacity: reparando ? 0.7 : 1 }]}
+              onPress={async () => {
+                setReparando(true);
+                try {
+                  const { data } = await axios.post(
+                    `${API_URL}/admin/reparar-emprestimos`,
+                    {},
+                    { headers: { Authorization: `Bearer ${token}` } }
+                  );
+                  Alert.alert('Reparo concluído', data.mensagem);
+                  await carregarDados();
+                } catch (err) {
+                  Alert.alert('Erro', getApiErrorMessage(err, 'Não foi possível reparar os dados.'));
+                } finally {
+                  setReparando(false);
+                }
+              }}
+              disabled={reparando}>
+              {reparando
+                ? <ActivityIndicator color={CORES.parch} />
+                : <Text style={[s.btnPrimaryText, { color: CORES.parch }]}>🔧 Reparar empréstimos órfãos</Text>}
+            </TouchableOpacity>
+          </View>
+
+          <Text style={[s.sectionLabel, { marginTop: 16 }]}>USUÁRIOS CADASTRADOS</Text>
           {usuariosAdmin.length === 0 ? (
             <View style={s.emptyBox}>
               <Text style={s.emptyText}>Nenhum usuário encontrado</Text>

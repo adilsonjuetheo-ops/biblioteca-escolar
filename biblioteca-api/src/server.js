@@ -955,6 +955,45 @@ app.post('/api/marlene', verifyToken, async (req, res) => {
   }
 });
 
+// ── Reparo de dados: remove empréstimos órfãos (usuarioId inválido) ───────────
+// Endpoint temporário — apenas bibliotecário pode usar
+app.post('/admin/reparar-emprestimos', verifyToken, requirePerfil('bibliotecario'), async (req, res) => {
+  const db = await readDb();
+
+  const orfaos = db.emprestimos.filter(
+    (e) => e.usuarioId === undefined || e.usuarioId === null || e.usuarioId === ''
+  );
+
+  if (orfaos.length === 0) {
+    return res.json({ reparados: 0, mensagem: 'Nenhum empréstimo órfão encontrado.' });
+  }
+
+  // Devolve os exemplares dos livros afetados antes de remover
+  for (const emp of orfaos) {
+    if (emp.status === 'reservado' || emp.status === 'retirado') {
+      const livro = db.livros.find((l) => l.id === emp.livroId);
+      if (livro) {
+        livro.disponiveis = Math.min((livro.disponiveis || 0) + 1, livro.totalExemplares || 1);
+        livro.atualizadoEm = new Date().toISOString();
+      }
+    }
+  }
+
+  // Remove os empréstimos órfãos
+  db.emprestimos = db.emprestimos.filter(
+    (e) => e.usuarioId !== undefined && e.usuarioId !== null && e.usuarioId !== ''
+  );
+
+  await writeDb(db);
+
+  console.log(`[Reparo] ${orfaos.length} empréstimo(s) órfão(s) removido(s).`);
+  res.json({
+    reparados: orfaos.length,
+    mensagem: `${orfaos.length} empréstimo(s) sem dono removido(s) e exemplares devolvidos ao acervo.`,
+    detalhes: orfaos.map((e) => ({ id: e.id, livroId: e.livroId, status: e.status })),
+  });
+});
+
 // ── Error handler ─────────────────────────────────────────────────────────────
 
 app.use((err, _req, res, _next) => {
