@@ -26,8 +26,9 @@
       "package": "br.com.adilsondev.bibliotecabmsq",
       "versionCode": 1,
       "permissions": [
-        "CAMERA",
-        "INTERNET"
+        "android.permission.CAMERA",
+        "android.permission.INTERNET",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -36,6 +37,11 @@
     "plugins": [
       "expo-camera",
       "expo-image-picker"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "4e9f49b6-7367-4dc1-99a6-0d0431d1874e"
+      }
+    }
   }
 }

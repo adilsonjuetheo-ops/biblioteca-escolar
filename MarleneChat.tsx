@@ -18,7 +18,7 @@ type Livro = {
   sinopse?: string; disponiveis?: number; totalExemplares?: number;
 };
 type Mensagem = { role: 'user' | 'assistant'; content: string; };
-type Props = { livro: Livro; acervo?: Livro[]; onFechar: () => void; };
+type Props = { livro: Livro; acervo?: Livro[]; token?: string; onFechar: () => void; };
 
 function buildSystemPrompt(livro: Livro, acervo: Livro[]): string {
   const acervoResumido = acervo.slice(0, 30).map(l =>
@@ -56,7 +56,7 @@ Acervo da biblioteca:
 ${acervoResumido || 'Acervo não disponível.'}`;
 }
 
-export default function MarleneChat({ livro, acervo = [], onFechar }: Props) {
+export default function MarleneChat({ livro, acervo = [], token, onFechar }: Props) {
   const [mensagens, setMensagens] = useState<Mensagem[]>([
     {
       role: 'assistant',
@@ -92,7 +92,10 @@ export default function MarleneChat({ livro, acervo = [], onFechar }: Props) {
     try {
       const response = await fetch(API_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           system: buildSystemPrompt(livro, acervo),
           messages: novasMensagens.map(m => ({ role: m.role, content: m.content })),

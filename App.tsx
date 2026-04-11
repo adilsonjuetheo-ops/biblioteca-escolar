@@ -1439,6 +1439,7 @@ export default function App() {
           <MarleneChat
             livro={livroSelecionado}
             acervo={livros}
+            token={token}
             onFechar={() => setMarleneAberta(false)}
           />
         )}

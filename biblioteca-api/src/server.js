@@ -5,6 +5,7 @@ const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const Anthropic = require('@anthropic-ai/sdk');
 
 const { readDb, writeDb } = require('./db');
 const { sendRecoveryCode } = require('./mailer');
@@ -903,6 +904,55 @@ app.delete('/desejos/:id', verifyToken, async (req, res) => {
   db.desejos.splice(idx, 1);
   await writeDb(db);
   res.status(204).end();
+});
+
+// ── Marlene — assistente virtual ─────────────────────────────────────────────
+
+const marleneRequests = new Map();
+const MARLENE_MAX_RPM = 10;
+
+app.post('/api/marlene', verifyToken, async (req, res) => {
+  const ip = req.ip;
+  const now = Date.now();
+  const windowMs = 60_000;
+
+  const entry = marleneRequests.get(ip) || { count: 0, start: now };
+  if (now - entry.start > windowMs) {
+    entry.count = 0;
+    entry.start = now;
+  }
+  entry.count += 1;
+  marleneRequests.set(ip, entry);
+
+  if (entry.count > MARLENE_MAX_RPM) {
+    return res.status(429).json({ erro: 'Muitas mensagens. Aguarde um momento.' });
+  }
+
+  const { system, messages } = req.body;
+  if (!system || !Array.isArray(messages) || messages.length === 0) {
+    return res.status(400).json({ erro: 'Parâmetros inválidos.' });
+  }
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    console.error('[Marlene] ANTHROPIC_API_KEY não configurada.');
+    return res.status(503).json({ erro: 'Serviço indisponível.' });
+  }
+
+  try {
+    const client = new Anthropic({ apiKey });
+    const response = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 512,
+      system,
+      messages,
+    });
+    const resposta = response.content?.[0]?.text ?? 'Não consegui responder agora. Tenta de novo!';
+    res.json({ resposta });
+  } catch (err) {
+    console.error('[Marlene] Erro Anthropic:', err.message);
+    res.status(502).json({ erro: 'Erro ao consultar assistente.' });
+  }
 });
 
 // ── Error handler ─────────────────────────────────────────────────────────────
