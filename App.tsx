@@ -420,7 +420,7 @@ export default function App() {
         uid
           ? safe(axios.get(`${API_URL}/desejos?usuarioId=${uid}`, { headers }), [] as Desejo[])
           : Promise.resolve({ data: [] as Desejo[] }),
-        usuarioAtual?.perfil === 'bibliotecario'
+        (usuarioAtual?.perfil === 'bibliotecario' || usuarioAtual?.perfil === 'professor')
           ? safe(axios.get(`${API_URL}/usuarios`, { headers }), [] as Usuario[])
           : Promise.resolve({ data: [] as Usuario[] }),
         safe(axios.get(`${API_URL}/comunicados`, { headers }), []),
@@ -2729,8 +2729,8 @@ export default function App() {
     );
 
     const renderReservasProfessor = () => {
-      const meusAtivos = emprestimosAtivos.filter(e => e.usuarioId === usuario?.id);
-      const meuHistorico = historico.filter(e => e.usuarioId === usuario?.id);
+      const meusAtivos = emprestimosAtivos;
+      const meuHistorico = historico;
       return (
         <ScrollView style={{ flex: 1 }}>
           <View style={s.homeHeader}>
