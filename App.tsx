@@ -2467,7 +2467,7 @@ export default function App() {
                 setReparando(true);
                 try {
                   const { data } = await axios.post(
-                    `${API_URL}/admin/reparar-emprestimos`,
+                    `${API_URL}/emprestimos/reparar-orfaos`,
                     {},
                     { headers: { Authorization: `Bearer ${token}` } }
                   );
