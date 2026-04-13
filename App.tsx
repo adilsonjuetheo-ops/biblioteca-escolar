@@ -1055,7 +1055,7 @@ export default function App() {
           </TouchableOpacity>
           <TouchableOpacity style={[s.btnSecundario, { borderColor: CORES.sage }]}
             onPress={() => setTela('cadastroProfessor')}>
-            <Text style={[s.btnSecundarioText, { color: CORES.sage }]}>📖  Cadastro de professor / bibliotecário</Text>
+            <Text style={[s.btnSecundarioText, { color: CORES.sage }]}>📖  Cadastro de professor</Text>
           </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
