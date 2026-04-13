@@ -244,21 +244,33 @@ app.post('/usuarios', async (req, res) => {
   }
 
   const senhaHash = await bcrypt.hash(String(senha), 10);
-  const novoUsuario = {
-    id: createId(),
-    nome: nomeStr,
-    email: emailNormalizado,
-    senhaHash,
-    perfil,
-    matricula: String(matricula || '').slice(0, 50),
-    turma: String(turma || '').slice(0, 50),
-    criadoEm: new Date().toISOString(),
-  };
 
-  db.usuarios.push(novoUsuario);
-  await writeDb(db);
+  const resultado = await withDbLock(async () => {
+    const dbAtual = await readDb();
+    if (dbAtual.usuarios.find((u) => u.email === emailNormalizado)) {
+      return { erro: 'Este e-mail ja esta cadastrado.', status: 409 };
+    }
+    const novoUsuario = {
+      id: createId(),
+      nome: nomeStr,
+      email: emailNormalizado,
+      senhaHash,
+      perfil,
+      matricula: String(matricula || '').slice(0, 50),
+      turma: String(turma || '').slice(0, 50),
+      criadoEm: new Date().toISOString(),
+    };
+    dbAtual.usuarios.push(novoUsuario);
+    await writeDb(dbAtual);
+    return { usuario: novoUsuario };
+  });
 
-  res.status(201).json(toPublicUser(novoUsuario));
+  if (resultado.erro) {
+    res.status(resultado.status).json({ erro: resultado.erro });
+    return;
+  }
+
+  res.status(201).json(toPublicUser(resultado.usuario));
 });
 
 app.post('/usuarios/login', async (req, res) => {
