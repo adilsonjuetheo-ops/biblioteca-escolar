@@ -1252,6 +1252,7 @@ export default function App() {
           </View>
         </ScrollView>
       </SafeAreaView>
+      </KeyboardAvoidingView>
     );
   }
 
