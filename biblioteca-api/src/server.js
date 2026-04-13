@@ -55,6 +55,18 @@ function limparFalhasLogin(ip) {
   loginAttempts.delete(ip);
 }
 
+// ── Mutex para operações de leitura-modificação-escrita no DB ────────────────
+// Evita race condition quando múltiplos cadastros ocorrem simultaneamente
+
+let _dbLock = Promise.resolve();
+
+function withDbLock(fn) {
+  const prev = _dbLock;
+  let release;
+  _dbLock = new Promise(r => { release = r; });
+  return prev.then(fn).finally(() => release());
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function normalizeEmail(email) {
