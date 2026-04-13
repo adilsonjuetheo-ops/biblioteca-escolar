@@ -523,7 +523,7 @@ export default function App() {
         { text: 'Fazer login', onPress: () => {
           setTela('login');
           setProfNome(''); setProfEmail(''); setProfSenha('');
-          setProfDisciplina(''); setProfCargo('professor');
+          setProfDisciplina('');
         }}
       ]);
     } catch (err: unknown) {
