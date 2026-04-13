@@ -518,7 +518,7 @@ export default function App() {
     try {
       const { data } = await axios.post(`${API_URL}/usuarios`, {
         nome: profNome, email: profEmail, senha: profSenha,
-        matricula: profDisciplina,
+        matricula: profDisciplina, perfil: 'professor',
       });
       Alert.alert('Cadastro realizado!', `Professor(a) ${data.nome} cadastrado(a)!`, [
         { text: 'Fazer login', onPress: () => {
