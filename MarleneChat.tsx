@@ -219,8 +219,8 @@ export default function MarleneChat({ livro, acervo = [], token, onFechar }: Pro
               <Text style={s.enviarIcon}>➤</Text>
             </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
       </Animated.View>
+      </KeyboardAvoidingView>
     </Animated.View>
   );
 }
