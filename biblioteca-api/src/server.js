@@ -236,13 +236,6 @@ app.post('/usuarios', async (req, res) => {
     return;
   }
 
-  const db = await readDb();
-  const existente = db.usuarios.find((u) => u.email === emailNormalizado);
-  if (existente) {
-    res.status(409).json({ erro: 'Este e-mail ja esta cadastrado.' });
-    return;
-  }
-
   const senhaHash = await bcrypt.hash(String(senha), 10);
 
   const resultado = await withDbLock(async () => {
