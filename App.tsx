@@ -451,7 +451,8 @@ export default function App() {
   async function handleLogin() {
     setErro('');
     if (!email || !senha) { setErro('Preencha todos os campos.'); return; }
-    if (!email.endsWith(DOMINIO_ALUNO) && !email.endsWith(DOMINIO_PROFESSOR)) {
+    const emailLower = email.toLowerCase();
+    if (!emailLower.endsWith(DOMINIO_ALUNO) && !emailLower.endsWith(DOMINIO_PROFESSOR)) {
       setErro('Use seu e-mail escolar institucional'); return;
     }
     setLoading(true);
