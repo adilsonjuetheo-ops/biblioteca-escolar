@@ -1005,8 +1005,9 @@ export default function App() {
   // ── LOGIN ──
   if (tela === 'login') {
     return (
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <SafeAreaView style={s.container}>
-        <ScrollView contentContainerStyle={s.loginBox}>
+        <ScrollView contentContainerStyle={s.loginBox} keyboardShouldPersistTaps="handled">
           <View style={s.logoWrap}>
             <Image source={require('./assets/logo.png')} style={s.logoImg} resizeMode="contain" />
           </View>
