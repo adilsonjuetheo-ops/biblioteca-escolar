@@ -84,6 +84,7 @@ function normalizeData(data) {
 
 async function readDb() {
   if (pool) {
+    if (!pgReady) pgReady = ensureTable().catch((err) => { console.error('[DB]', err.message); pgReady = null; });
     await pgReady;
     const result = await pool.query('SELECT data FROM app_data WHERE id = 1');
     return normalizeData(result.rows[0]?.data || {});
