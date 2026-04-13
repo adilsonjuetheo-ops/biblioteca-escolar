@@ -200,8 +200,7 @@ export default function MarleneChat({ livro, acervo = [], token, onFechar }: Pro
           </ScrollView>
         )}
 
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={s.inputArea}>
+        <View style={s.inputArea}>
             <TextInput
               style={s.input}
               placeholder="Pergunte para a Marlene..."
