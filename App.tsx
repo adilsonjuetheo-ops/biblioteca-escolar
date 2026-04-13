@@ -482,7 +482,7 @@ export default function App() {
     if (!cadNome || !cadEmail || !cadSenha || !cadMatricula || !cadTurma) {
       Alert.alert('Atenção', 'Preencha todos os campos.'); return;
     }
-    if (!cadEmail.endsWith(DOMINIO_ALUNO)) {
+    if (!cadEmail.toLowerCase().endsWith(DOMINIO_ALUNO)) {
       Alert.alert('E-mail inválido', `Use ${DOMINIO_ALUNO}`); return;
     }
     if (cadSenha.length < 6) {
