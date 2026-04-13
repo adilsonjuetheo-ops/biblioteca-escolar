@@ -233,6 +233,10 @@ const s = StyleSheet.create({
     justifyContent: 'flex-end',
     zIndex: 999,
   },
+  keyboardWrapper: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
   container: {
     backgroundColor: CORES.parch,
     borderTopLeftRadius: 24,
