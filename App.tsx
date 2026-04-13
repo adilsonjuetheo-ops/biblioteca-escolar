@@ -491,7 +491,7 @@ export default function App() {
     try {
       const { data } = await axios.post(`${API_URL}/usuarios`, {
         nome: cadNome, email: cadEmail, senha: cadSenha,
-        matricula: cadMatricula, turma: cadTurma,
+        matricula: cadMatricula, turma: cadTurma, perfil: 'aluno',
       });
       Alert.alert('Cadastro realizado!', `Bem-vindo(a), ${data.nome}!`, [
         { text: 'Fazer login', onPress: () => {
