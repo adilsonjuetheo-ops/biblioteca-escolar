@@ -1207,12 +1207,8 @@ export default function App() {
           <TouchableOpacity onPress={() => setTela('login')} style={s.voltarBtn}>
             <Text style={s.voltarText}>← Voltar</Text>
           </TouchableOpacity>
-          <Text style={s.paginaTitulo}>
-            {profCargo === 'bibliotecario' ? 'Cadastro de bibliotecário' :
-             profCargo === 'coordenacao'   ? 'Cadastro de coordenação'   :
-             'Cadastro de professor'}
-          </Text>
-          <Text style={s.paginaSub}>📖 Professores e bibliotecários · {DOMINIO_PROFESSOR}</Text>
+          <Text style={s.paginaTitulo}>Cadastro de professor</Text>
+          <Text style={s.paginaSub}>📖 Professores · {DOMINIO_PROFESSOR}</Text>
           <Text style={s.label}>Nome completo *</Text>
           <TextInput style={s.input} placeholder="Seu nome completo"
             placeholderTextColor={CORES.muted}
@@ -1222,24 +1218,10 @@ export default function App() {
             placeholderTextColor={CORES.muted}
             value={profEmail} onChangeText={setProfEmail}
             keyboardType="email-address" autoCapitalize="none" />
-          <Text style={s.label}>Disciplina / Função *</Text>
-          <TextInput style={s.input} placeholder="Ex: Português, Bibliotecário(a)"
+          <Text style={s.label}>Disciplina *</Text>
+          <TextInput style={s.input} placeholder="Ex: Português, Matemática, História"
             placeholderTextColor={CORES.muted}
             value={profDisciplina} onChangeText={setProfDisciplina} autoCapitalize="words" />
-          <Text style={s.label}>Cargo</Text>
-          <View style={s.radioRow}>
-            {[
-              { key: 'professor', label: 'Professor' },
-              { key: 'bibliotecario', label: 'Bibliotecário' },
-              { key: 'coordenacao', label: 'Coordenação' },
-            ].map(c => (
-              <TouchableOpacity key={c.key}
-                style={[s.radioBtn, profCargo === c.key && s.radioBtnAtivo]}
-                onPress={() => setProfCargo(c.key)}>
-                <Text style={[s.radioText, profCargo === c.key && s.radioTextAtivo]}>{c.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
           <Text style={s.label}>Senha *</Text>
           <TextInput style={s.input} placeholder="Mínimo 6 caracteres"
             placeholderTextColor={CORES.muted}
