@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, Alert, SafeAreaView, ScrollView,
+  StyleSheet, Alert, ScrollView,
   ActivityIndicator, Image, KeyboardAvoidingView, Platform
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import MarleneChat from './MarleneChat';
