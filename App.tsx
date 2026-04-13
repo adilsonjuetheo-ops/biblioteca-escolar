@@ -509,7 +509,7 @@ export default function App() {
     if (!profNome || !profEmail || !profSenha || !profDisciplina) {
       Alert.alert('Atenção', 'Preencha todos os campos.'); return;
     }
-    if (!profEmail.endsWith(DOMINIO_PROFESSOR)) {
+    if (!profEmail.toLowerCase().endsWith(DOMINIO_PROFESSOR)) {
       Alert.alert('E-mail inválido', `Use ${DOMINIO_PROFESSOR}`); return;
     }
     if (profSenha.length < 6) {
