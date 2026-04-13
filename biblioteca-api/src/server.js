@@ -1011,6 +1011,92 @@ app.post('/admin/reparar-emprestimos', verifyToken, requirePerfil('bibliotecario
   });
 });
 
+// ── Comunicados ───────────────────────────────────────────────────────────────
+
+app.get('/comunicados', verifyToken, async (_, res) => {
+  const db = await readDb();
+  res.json(db.comunicados || []);
+});
+
+app.post('/comunicados', verifyToken, requirePerfil('bibliotecario', 'professor'), async (req, res) => {
+  const { titulo, mensagem, tipo = 'info' } = req.body || {};
+  if (!titulo || !mensagem) {
+    res.status(400).json({ erro: 'titulo e mensagem sao obrigatorios.' });
+    return;
+  }
+  const db = await readDb();
+  const novo = {
+    id: createId(),
+    titulo: String(titulo).trim().slice(0, 200),
+    mensagem: String(mensagem).trim().slice(0, 2000),
+    tipo: String(tipo).trim().slice(0, 50),
+    autorId: req.usuario.id,
+    autorNome: db.usuarios.find((u) => u.id === req.usuario.id)?.nome || '',
+    criadoEm: new Date().toISOString(),
+  };
+  db.comunicados.push(novo);
+  await writeDb(db);
+  res.status(201).json(novo);
+});
+
+app.delete('/comunicados/:id', verifyToken, requirePerfil('bibliotecario'), async (req, res) => {
+  const db = await readDb();
+  const idx = db.comunicados.findIndex((c) => c.id === req.params.id);
+  if (idx === -1) { res.status(404).json({ erro: 'Comunicado nao encontrado.' }); return; }
+  db.comunicados.splice(idx, 1);
+  await writeDb(db);
+  res.status(204).end();
+});
+
+// ── Suspensões ────────────────────────────────────────────────────────────────
+
+app.get('/suspensoes', verifyToken, requirePerfil('bibliotecario', 'professor'), async (_, res) => {
+  const db = await readDb();
+  res.json(db.suspensoes || []);
+});
+
+app.get('/suspensoes/verificar/:usuarioId', verifyToken, async (req, res) => {
+  const db = await readDb();
+  const agora = new Date();
+  const suspensaoAtiva = (db.suspensoes || []).find(
+    (s) => s.usuarioId === req.params.usuarioId && new Date(s.expiraEm) > agora
+  );
+  if (suspensaoAtiva) {
+    res.json({ bloqueado: true, expiraEm: suspensaoAtiva.expiraEm, motivo: suspensaoAtiva.motivo });
+  } else {
+    res.json({ bloqueado: false });
+  }
+});
+
+app.post('/suspensoes', verifyToken, requirePerfil('bibliotecario'), async (req, res) => {
+  const { usuarioId, motivo = 'Devolucao em atraso', dias = 7 } = req.body || {};
+  if (!usuarioId) { res.status(400).json({ erro: 'usuarioId e obrigatorio.' }); return; }
+  const db = await readDb();
+  const usuario = db.usuarios.find((u) => u.id === usuarioId);
+  if (!usuario) { res.status(404).json({ erro: 'Usuario nao encontrado.' }); return; }
+  const expiraEm = new Date(Date.now() + Number(dias) * 24 * 60 * 60 * 1000).toISOString();
+  const nova = {
+    id: createId(),
+    usuarioId,
+    motivo: String(motivo).trim().slice(0, 300),
+    expiraEm,
+    criadoEm: new Date().toISOString(),
+  };
+  db.suspensoes = (db.suspensoes || []).filter((s) => s.usuarioId !== usuarioId);
+  db.suspensoes.push(nova);
+  await writeDb(db);
+  res.status(201).json(nova);
+});
+
+app.delete('/suspensoes/:id', verifyToken, requirePerfil('bibliotecario'), async (req, res) => {
+  const db = await readDb();
+  const idx = (db.suspensoes || []).findIndex((s) => s.id === req.params.id);
+  if (idx === -1) { res.status(404).json({ erro: 'Suspensao nao encontrada.' }); return; }
+  db.suspensoes.splice(idx, 1);
+  await writeDb(db);
+  res.status(204).end();
+});
+
 // ── Error handler ─────────────────────────────────────────────────────────────
 
 app.use((err, _req, res, _next) => {
