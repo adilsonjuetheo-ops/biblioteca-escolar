@@ -46,7 +46,8 @@ if (DATABASE_URL) {
 
   pgReady = ensureTable().catch((err) => {
     console.error('[DB] Falha ao conectar ao PostgreSQL:', err.message);
-    process.exit(1);
+    // Reinicia a promessa para que a próxima requisição tente novamente
+    pgReady = null;
   });
 }
 
