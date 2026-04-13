@@ -1065,8 +1065,9 @@ export default function App() {
 
   if (tela === 'esqueci') {
     return (
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <SafeAreaView style={s.container}>
-        <ScrollView contentContainerStyle={s.loginBox}>
+        <ScrollView contentContainerStyle={s.loginBox} keyboardShouldPersistTaps="handled">
           <TouchableOpacity
             onPress={() => {
               resetarFluxoRecuperacao();
