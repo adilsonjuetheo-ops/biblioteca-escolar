@@ -217,14 +217,11 @@ app.post('/usuarios', async (req, res) => {
     return;
   }
 
-  if (!isEmailEscolar(emailNormalizado)) {
-    res.status(400).json({ erro: 'Use um e-mail escolar institucional valido.' });
+  const perfil = String(req.body?.perfil || '').trim();
+  if (perfil !== 'aluno' && perfil !== 'professor') {
+    res.status(400).json({ erro: 'Perfil invalido. Use aluno ou professor.' });
     return;
   }
-
-  // Perfil é derivado do domínio — cliente não controla
-  const perfil = emailNormalizado.endsWith(DOMINIO_ALUNO) ? 'aluno' : 'professor';
-  console.log(`[CADASTRO] email="${emailNormalizado}" endsWith(ALUNO)=${emailNormalizado.endsWith(DOMINIO_ALUNO)} endsWith(PROF)=${emailNormalizado.endsWith(DOMINIO_PROFESSOR)} → perfil=${perfil}`);
 
   const nomeStr = String(nome).trim().slice(0, 150);
   if (!nomeStr) {
