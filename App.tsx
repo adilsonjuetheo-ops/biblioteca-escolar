@@ -3,7 +3,7 @@ import axios from 'axios';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, Alert, SafeAreaView, ScrollView,
-  ActivityIndicator, Image
+  ActivityIndicator, Image, KeyboardAvoidingView, Platform
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
