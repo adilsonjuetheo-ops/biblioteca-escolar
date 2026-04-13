@@ -311,7 +311,6 @@ export default function App() {
   const [profEmail, setProfEmail] = useState('');
   const [profSenha, setProfSenha] = useState('');
   const [profDisciplina, setProfDisciplina] = useState('');
-  const [profCargo, setProfCargo] = useState('professor');
 
   const [recEmail, setRecEmail] = useState('');
   const [recCodigo, setRecCodigo] = useState('');
