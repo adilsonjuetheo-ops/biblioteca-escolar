@@ -521,7 +521,7 @@ export default function App() {
     }
     try {
       const { data } = await axios.post(`${API_URL}/usuarios`, {
-        nome: profNome, email: profEmail, senha: profSenha,
+        nome: profNome.trim(), email: profEmail.trim(), senha: profSenha.trim(),
         matricula: profDisciplina, perfil: 'professor',
       });
       const emailProf = profEmail.toLowerCase().trim();
