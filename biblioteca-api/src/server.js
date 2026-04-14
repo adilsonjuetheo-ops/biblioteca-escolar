@@ -199,6 +199,8 @@ app.use(
 );
 
 app.use(express.json({ limit: '256kb' }));
+app.set('etag', false);
+app.use((_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
 
 // ── Rotas públicas ────────────────────────────────────────────────────────────
 
