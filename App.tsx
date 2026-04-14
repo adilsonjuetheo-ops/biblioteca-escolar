@@ -2873,13 +2873,22 @@ export default function App() {
     };
 
     const renderRankingProfessor = () => {
-      const ranking = usuariosAdmin
-        .filter(u => u.perfil === 'aluno')
-        .map(u => ({
-          ...u,
-          total: emprestimosEscola.filter(e => e.usuarioId === u.id).length,
-        }))
-        .filter(u => u.total > 0)
+      const contagemPorAluno = new Map<string, { id: string; nome: string; turma: string; total: number }>();
+      emprestimosEscola.forEach(e => {
+        if (!e.usuarioId) return;
+        const entry = contagemPorAluno.get(e.usuarioId);
+        if (entry) {
+          entry.total += 1;
+        } else {
+          contagemPorAluno.set(e.usuarioId, {
+            id: e.usuarioId,
+            nome: e.usuarioNome || 'Aluno',
+            turma: e.usuarioTurma || '',
+            total: 1,
+          });
+        }
+      });
+      const ranking = Array.from(contagemPorAluno.values())
         .sort((a, b) => b.total - a.total)
         .slice(0, 20);
 
