@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
-  StyleSheet, ActivityIndicator, Animated, Platform, Keyboard,
+  StyleSheet, ActivityIndicator, Animated, Platform, Keyboard, Dimensions,
 } from 'react-native';
 
 const CORES = {
@@ -10,8 +10,12 @@ const CORES = {
   rust: '#b84c2e', muted: '#8a7d68', card: '#fdfaf4', border: '#d9cfbe',
 };
 
-// ← aponta para sua própria API, não para a Anthropic diretamente
 const API_URL = 'https://bibliotecaapi-production-7ee0.up.railway.app/api/marlene';
+const { height: SCREEN_H } = Dimensions.get('window');
+// Altura fixa do container: garante que caiba na tela mesmo com teclado aberto.
+// marginBottom (kbAnim) eleva o container; o topo extra fica oculto fora da tela,
+// mas o campo de input e as mensagens recentes ficam sempre visíveis.
+const CONTAINER_H = Math.round(SCREEN_H * 0.72);
 
 type Livro = {
   id: string; titulo: string; autor?: string; genero?: string;
@@ -66,23 +70,32 @@ export default function MarleneChat({ livro, acervo = [], token, onFechar }: Pro
   const [input, setInput] = useState('');
   const [carregando, setCarregando] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
+  // fadeAnim: useNativeDriver: true (só opacity no overlay)
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const kbAnim = useRef(new Animated.Value(0)).current;      // teclado: eleva o container
+  // kbAnim: useNativeDriver: false (marginBottom no container — Animated.View separado, sem conflito)
+  const kbAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
   }, []);
 
   useEffect(() => {
-    const show = Keyboard.addListener(
+    const onShow = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      e => Animated.timing(kbAnim, { toValue: e.endCoordinates.height, duration: 250, useNativeDriver: false }).start()
+      e => {
+        Animated.timing(kbAnim, {
+          toValue: e.endCoordinates.height,
+          duration: Platform.OS === 'ios' ? e.duration || 250 : 250,
+          useNativeDriver: false,
+        }).start();
+        setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300);
+      }
     );
-    const hide = Keyboard.addListener(
+    const onHide = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
       () => Animated.timing(kbAnim, { toValue: 0, duration: 200, useNativeDriver: false }).start()
     );
-    return () => { show.remove(); hide.remove(); };
+    return () => { onShow.remove(); onHide.remove(); };
   }, []);
 
   useEffect(() => {
@@ -111,9 +124,7 @@ export default function MarleneChat({ livro, acervo = [], token, onFechar }: Pro
         }),
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
       const data = await response.json();
       const resposta = data?.resposta || 'Desculpa, não consegui responder agora. Tenta de novo! 😅';
@@ -137,8 +148,12 @@ export default function MarleneChat({ livro, acervo = [], token, onFechar }: Pro
   ];
 
   return (
+    // Overlay: só tem opacity — usa useNativeDriver: true sem problema
     <Animated.View style={[s.overlay, { opacity: fadeAnim }]}>
-      <Animated.View style={[s.container, { bottom: kbAnim }]}>
+
+      {/* Container: só tem marginBottom — usa useNativeDriver: false sem conflito */}
+      <Animated.View style={[s.container, { marginBottom: kbAnim }]}>
+
         <View style={s.header}>
           <View style={s.headerLeft}>
             <View style={s.avatar}>
@@ -206,24 +221,25 @@ export default function MarleneChat({ livro, acervo = [], token, onFechar }: Pro
         )}
 
         <View style={s.inputArea}>
-            <TextInput
-              style={s.input}
-              placeholder="Pergunte para a Marlene..."
-              placeholderTextColor={CORES.muted}
-              value={input}
-              onChangeText={setInput}
-              onSubmitEditing={enviarMensagem}
-              returnKeyType="send"
-              multiline
-              maxLength={500}
-            />
-            <TouchableOpacity
-              style={[s.enviarBtn, (!input.trim() || carregando) && s.enviarBtnDisabled]}
-              onPress={enviarMensagem}
-              disabled={!input.trim() || carregando}>
-              <Text style={s.enviarIcon}>➤</Text>
-            </TouchableOpacity>
-          </View>
+          <TextInput
+            style={s.input}
+            placeholder="Pergunte para a Marlene..."
+            placeholderTextColor={CORES.muted}
+            value={input}
+            onChangeText={setInput}
+            onSubmitEditing={enviarMensagem}
+            returnKeyType="send"
+            multiline
+            maxLength={500}
+          />
+          <TouchableOpacity
+            style={[s.enviarBtn, (!input.trim() || carregando) && s.enviarBtnDisabled]}
+            onPress={enviarMensagem}
+            disabled={!input.trim() || carregando}>
+            <Text style={s.enviarIcon}>➤</Text>
+          </TouchableOpacity>
+        </View>
+
       </Animated.View>
     </Animated.View>
   );
@@ -234,12 +250,11 @@ const s = StyleSheet.create({
     position: 'absolute',
     top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(26,18,8,0.5)',
+    justifyContent: 'flex-end',   // empurra container para o rodapé
     zIndex: 999,
   },
   container: {
-    position: 'absolute',
-    left: 0, right: 0,
-    top: '20%',
+    height: CONTAINER_H,           // altura fixa em pixels (72% da tela)
     backgroundColor: CORES.parch,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
