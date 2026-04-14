@@ -67,14 +67,10 @@ export default function MarleneChat({ livro, acervo = [], token, onFechar }: Pro
   const [carregando, setCarregando] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(60)).current;  // entrada: começa 60px abaixo
   const kbAnim = useRef(new Animated.Value(0)).current;      // teclado: eleva o container
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
-      Animated.timing(slideAnim, { toValue: 0, duration: 350, useNativeDriver: false }),
-    ]).start();
+    Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
   }, []);
 
   useEffect(() => {
