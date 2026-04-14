@@ -232,12 +232,13 @@ app.post('/usuarios', async (req, res) => {
     return;
   }
 
-  if (String(senha).length < 6) {
+  const senhaTrimmed = String(senha).trim();
+  if (senhaTrimmed.length < 6) {
     res.status(400).json({ erro: 'A senha deve ter no minimo 6 caracteres.' });
     return;
   }
 
-  const senhaHash = await bcrypt.hash(String(senha), 10);
+  const senhaHash = await bcrypt.hash(senhaTrimmed, 10);
 
   const resultado = await withDbLock(async () => {
     const dbAtual = await readDb();
