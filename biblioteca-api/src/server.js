@@ -123,6 +123,7 @@ function normalizeLivroPayload(payload = {}) {
     genero: String(payload.genero || '').trim().slice(0, 100),
     capa: String(payload.capa || '').trim().slice(0, 500),
     sinopse: String(payload.sinopse || '').trim().slice(0, 2000),
+    prateleira: String(payload.prateleira || '').trim().slice(0, 100),
     totalExemplares,
     disponiveis,
   };
