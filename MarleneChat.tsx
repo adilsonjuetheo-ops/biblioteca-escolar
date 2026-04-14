@@ -68,12 +68,25 @@ export default function MarleneChat({ livro, acervo = [], token, onFechar }: Pro
   const scrollRef = useRef<ScrollView>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(60)).current;
+  const kbAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
       Animated.spring(slideAnim, { toValue: 0, tension: 80, friction: 12, useNativeDriver: true }),
     ]).start();
+  }, []);
+
+  useEffect(() => {
+    const show = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      e => Animated.timing(kbAnim, { toValue: e.endCoordinates.height, duration: 250, useNativeDriver: false }).start()
+    );
+    const hide = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => Animated.timing(kbAnim, { toValue: 0, duration: 200, useNativeDriver: false }).start()
+    );
+    return () => { show.remove(); hide.remove(); };
   }, []);
 
   useEffect(() => {
