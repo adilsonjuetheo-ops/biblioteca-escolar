@@ -422,7 +422,10 @@ export default function App() {
           ? safe(axios.get(`${API_URL}/desejos?usuarioId=${uid}`, { headers }), [] as Desejo[])
           : Promise.resolve({ data: [] as Desejo[] }),
         (usuarioAtual?.perfil === 'bibliotecario' || usuarioAtual?.perfil === 'professor')
-          ? safe(axios.get(`${API_URL}/usuarios`, { headers }), [] as Usuario[])
+          ? axios.get(`${API_URL}/usuarios`, { headers }).catch((err: any) => {
+              console.warn('[usuarios] erro:', err?.response?.status, JSON.stringify(err?.response?.data));
+              return { data: [] as Usuario[] };
+            })
           : Promise.resolve({ data: [] as Usuario[] }),
         safe(axios.get(`${API_URL}/comunicados`, { headers }), []),
         safe(axios.get(`${API_URL}/suspensoes`, { headers }), []),
