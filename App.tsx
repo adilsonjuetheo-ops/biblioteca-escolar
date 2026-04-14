@@ -494,8 +494,11 @@ export default function App() {
         nome: cadNome, email: cadEmail, senha: cadSenha,
         matricula: cadMatricula, turma: cadTurma, perfil: 'aluno',
       });
-      Alert.alert('Cadastro realizado!', `Bem-vindo(a), ${data.nome}!`, [
+      const emailCadastrado = cadEmail.toLowerCase().trim();
+      Alert.alert('Cadastro realizado!', `Bem-vindo(a), ${data.nome}! Agora entre com seu e-mail e senha.`, [
         { text: 'Fazer login', onPress: () => {
+          setEmail(emailCadastrado); // pré-preenche o campo de e-mail no login
+          setSenha('');
           setTela('login');
           setCadNome(''); setCadEmail(''); setCadSenha('');
           setCadMatricula(''); setCadTurma('');
