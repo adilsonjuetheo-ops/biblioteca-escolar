@@ -230,6 +230,7 @@ export default function MarleneChat({ livro, acervo = [], token, onFechar }: Pro
             </TouchableOpacity>
           </View>
       </Animated.View>
+      </Animated.View>
     </Animated.View>
   );
 }
