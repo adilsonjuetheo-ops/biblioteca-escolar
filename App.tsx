@@ -973,7 +973,9 @@ export default function App() {
     if (!livroScaneado) return;
     setSalvandoScan(true);
     try {
-      await axios.post(`${API_URL}/api/scan-livro/cadastrar`, livroScaneado);
+      await axios.post(`${API_URL}/livros`, livroScaneado, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       Alert.alert('✅ Livro cadastrado!', `"${livroScaneado.titulo}" foi adicionado ao acervo.`);
       setLivroScaneado(null);
       await carregarDados();
