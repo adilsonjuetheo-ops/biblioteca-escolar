@@ -491,8 +491,8 @@ export default function App() {
     }
     try {
       const { data } = await axios.post(`${API_URL}/usuarios`, {
-        nome: cadNome, email: cadEmail, senha: cadSenha,
-        matricula: cadMatricula, turma: cadTurma, perfil: 'aluno',
+        nome: cadNome.trim(), email: cadEmail.trim(), senha: cadSenha.trim(),
+        matricula: cadMatricula.trim(), turma: cadTurma.trim(), perfil: 'aluno',
       });
       const emailCadastrado = cadEmail.toLowerCase().trim();
       Alert.alert('Cadastro realizado!', `Bem-vindo(a), ${data.nome}! Agora entre com seu e-mail e senha.`, [
