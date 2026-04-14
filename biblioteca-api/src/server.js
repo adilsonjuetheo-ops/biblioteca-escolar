@@ -924,6 +924,54 @@ app.delete('/desejos/:id', verifyToken, async (req, res) => {
   res.status(204).end();
 });
 
+// ── Scan de capa — identifica livro por foto ─────────────────────────────────
+
+app.post('/api/scan-livro/analisar', verifyToken, requirePerfil('bibliotecario'), async (req, res) => {
+  const { imagemBase64, mediaType = 'image/jpeg' } = req.body || {};
+  if (!imagemBase64) {
+    return res.status(400).json({ erro: 'imagemBase64 é obrigatório.' });
+  }
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return res.status(503).json({ erro: 'Serviço indisponível.' });
+  }
+
+  try {
+    const client = new Anthropic({ apiKey });
+    const response = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 512,
+      messages: [{
+        role: 'user',
+        content: [
+          {
+            type: 'image',
+            source: { type: 'base64', media_type: mediaType, data: imagemBase64 },
+          },
+          {
+            type: 'text',
+            text: 'Identifique este livro. Responda SOMENTE com um JSON válido no formato: {"titulo":"...","autor":"...","genero":"...","sinopse":"..."}\nSe não conseguir identificar algum campo, use string vazia. Não inclua nada fora do JSON.',
+          },
+        ],
+      }],
+    });
+
+    const texto = response.content?.[0]?.text ?? '{}';
+    const match = texto.match(/\{[\s\S]*\}/);
+    const dados = match ? JSON.parse(match[0]) : {};
+    res.json({
+      titulo: String(dados.titulo || '').trim(),
+      autor: String(dados.autor || '').trim(),
+      genero: String(dados.genero || '').trim(),
+      sinopse: String(dados.sinopse || '').trim(),
+    });
+  } catch (err) {
+    console.error('[ScanLivro]', err.message);
+    res.status(502).json({ erro: 'Não foi possível identificar o livro.' });
+  }
+});
+
 // ── Marlene — assistente virtual ─────────────────────────────────────────────
 
 const marleneRequests = new Map();
