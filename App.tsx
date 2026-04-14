@@ -1375,28 +1375,42 @@ export default function App() {
           ) : null}
 
           <View style={{ marginTop: 24, gap: 12 }}>
-            {livroSelecionado?.disponiveis > 0 ? (
-              <TouchableOpacity style={s.btnDetalheReserva} onPress={() => handleReserva(livroSelecionado)}>
-                <Text style={s.btnDetalheReservaText}>✓ Confirmar reserva</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                style={[s.btnDetalheReserva, { backgroundColor: CORES.muted }]}
-                onPress={async () => {
-                  if (!usuario) return;
-                  try {
-                    await axios.post(`${API_URL}/desejos`, {
-                      livroId: livroSelecionado?.id,
-                    });
-                    Alert.alert('Fila de espera', 'Você foi adicionado à lista de desejos! Será avisado quando disponível.');
-                    await carregarDados();
-                  } catch {
-                    Alert.alert('Aviso', 'Você já está na lista de desejos para este livro.');
-                  }
-                }}>
-                <Text style={s.btnDetalheReservaText}>🔔 Entrar na fila de espera</Text>
-              </TouchableOpacity>
-            )}
+            {(() => {
+              const jaEmprestado = emprestimosAtivos.some(
+                e => e.livroId === livroSelecionado?.id &&
+                     (e.status === 'reservado' || e.status === 'retirado')
+              );
+              if (jaEmprestado) {
+                return (
+                  <View style={[s.btnDetalheReserva, { backgroundColor: CORES.muted }]}>
+                    <Text style={s.btnDetalheReservaText}>✓ Já reservado</Text>
+                  </View>
+                );
+              }
+              if ((livroSelecionado?.disponiveis ?? 0) > 0) {
+                return (
+                  <TouchableOpacity style={s.btnDetalheReserva} onPress={() => handleReserva(livroSelecionado!)}>
+                    <Text style={s.btnDetalheReservaText}>✓ Confirmar reserva</Text>
+                  </TouchableOpacity>
+                );
+              }
+              return (
+                <TouchableOpacity
+                  style={[s.btnDetalheReserva, { backgroundColor: CORES.muted }]}
+                  onPress={async () => {
+                    if (!usuario) return;
+                    try {
+                      await axios.post(`${API_URL}/desejos`, { livroId: livroSelecionado?.id });
+                      Alert.alert('Fila de espera', 'Você foi adicionado à lista de desejos! Será avisado quando disponível.');
+                      await carregarDados();
+                    } catch {
+                      Alert.alert('Aviso', 'Você já está na lista de desejos para este livro.');
+                    }
+                  }}>
+                  <Text style={s.btnDetalheReservaText}>🔔 Entrar na fila de espera</Text>
+                </TouchableOpacity>
+              );
+            })()}
             <TouchableOpacity
               style={[s.btnSecundario, { marginTop: 8 }]}
               onPress={() => setMarleneAberta(true)}>
