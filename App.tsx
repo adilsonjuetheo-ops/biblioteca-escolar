@@ -53,6 +53,7 @@ type Livro = {
   genero?: string;
   sinopse?: string;
   capa?: string;
+  prateleira?: string;
   totalExemplares?: number;
   disponiveis: number;
 };
