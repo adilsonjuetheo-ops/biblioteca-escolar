@@ -2419,6 +2419,16 @@ export default function App() {
                   </TouchableOpacity>
                 </View>
 
+                <Text style={[s.label, { marginTop: 12 }]}>PRATELEIRA</Text>
+                <TextInput
+                  style={s.input}
+                  placeholder="Ex: A1, B3, Corredor 2..."
+                  placeholderTextColor={CORES.muted}
+                  value={livroScaneado.prateleira || ''}
+                  onChangeText={v => setLivroScaneado(prev => prev ? { ...prev, prateleira: v } : prev)}
+                  autoCapitalize="characters"
+                />
+
                 <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
                   <TouchableOpacity
                     style={[s.btnDetalheVoltar, { flex: 1 }]}
