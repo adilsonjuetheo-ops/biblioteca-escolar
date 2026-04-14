@@ -295,7 +295,7 @@ app.post('/usuarios/login', async (req, res) => {
     return;
   }
 
-  const ok = await bcrypt.compare(String(senha), usuario.senhaHash);
+  const ok = await bcrypt.compare(String(senha).trim(), usuario.senhaHash);
   if (!ok) {
     registrarFalhaLogin(ip);
     res.status(401).json({ erro: 'E-mail ou senha incorretos.' });
