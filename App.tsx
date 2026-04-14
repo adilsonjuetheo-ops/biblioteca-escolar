@@ -458,7 +458,7 @@ export default function App() {
     }
     setLoading(true);
     try {
-      const { data } = await axios.post(`${API_URL}/usuarios/login`, { email, senha });
+      const { data } = await axios.post(`${API_URL}/usuarios/login`, { email: email.trim(), senha: senha.trim() });
       const iniciais = data.nome.split(' ').map((p: string) => p[0].toUpperCase()).join('').slice(0, 2);
       const usuarioLogado = { ...data, iniciais };
       setUsuario(usuarioLogado);
