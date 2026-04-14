@@ -2892,9 +2892,6 @@ export default function App() {
           </View>
           <View style={{ padding: 16, gap: 10 }}>
             <Text style={s.sectionLabel}>🏆 ALUNOS MAIS LEITORES DA ESCOLA</Text>
-            <Text style={{ color: CORES.muted, fontSize: 11 }}>
-              [debug] usuarios:{usuariosAdmin.length} alunos:{usuariosAdmin.filter(u=>u.perfil==='aluno').length} emprestimos:{emprestimosEscola.length}
-            </Text>
             {carregando ? (
               <ActivityIndicator color={CORES.amber} size="large" style={{ marginTop: 40 }} />
             ) : ranking.length === 0 ? (
