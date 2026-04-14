@@ -524,8 +524,11 @@ export default function App() {
         nome: profNome, email: profEmail, senha: profSenha,
         matricula: profDisciplina, perfil: 'professor',
       });
-      Alert.alert('Cadastro realizado!', `Professor(a) ${data.nome} cadastrado(a)!`, [
+      const emailProf = profEmail.toLowerCase().trim();
+      Alert.alert('Cadastro realizado!', `Professor(a) ${data.nome} cadastrado(a)! Agora entre com seu e-mail e senha.`, [
         { text: 'Fazer login', onPress: () => {
+          setEmail(emailProf); // pré-preenche o campo de e-mail no login
+          setSenha('');
           setTela('login');
           setProfNome(''); setProfEmail(''); setProfSenha('');
           setProfDisciplina('');
