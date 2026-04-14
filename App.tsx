@@ -1196,7 +1196,8 @@ export default function App() {
           <Text style={s.label}>Senha *</Text>
           <TextInput style={s.input} placeholder="Mínimo 6 caracteres"
             placeholderTextColor={CORES.muted}
-            value={cadSenha} onChangeText={setCadSenha} secureTextEntry />
+            value={cadSenha} onChangeText={setCadSenha}
+            secureTextEntry autoComplete="new-password" textContentType="newPassword" />
           <TouchableOpacity style={[s.btnPrimary, { marginTop: 8 }]} onPress={handleCadastroAluno}>
             <Text style={s.btnPrimaryText}>Criar conta</Text>
           </TouchableOpacity>
