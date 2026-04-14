@@ -1037,7 +1037,8 @@ export default function App() {
             <TextInput style={[s.input, { flex: 1, marginBottom: 0 }]}
               placeholder="Senha" placeholderTextColor={CORES.muted}
               value={senha} onChangeText={setSenha}
-              secureTextEntry={!mostrarSenha} />
+              secureTextEntry={!mostrarSenha}
+              autoComplete="current-password" textContentType="password" />
             <TouchableOpacity style={s.olhoBtn} onPress={() => setMostrarSenha(!mostrarSenha)}>
               <Text style={{ fontSize: 16 }}>{mostrarSenha ? '🙈' : '👁️'}</Text>
             </TouchableOpacity>
