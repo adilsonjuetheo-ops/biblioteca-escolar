@@ -353,7 +353,7 @@ export default function App() {
   const [scanandoCapa, setScanandoCapa] = useState(false);
   const [livroScaneado, setLivroScaneado] = useState<{
     titulo: string; autor?: string; genero?: string;
-    sinopse?: string; totalExemplares: number; capa?: string;
+    sinopse?: string; totalExemplares: number; capa?: string; prateleira?: string;
   } | null>(null);
   const [salvandoScan, setSalvandoScan] = useState(false);
   const [reparando, setReparando] = useState(false);
