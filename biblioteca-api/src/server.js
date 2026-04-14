@@ -563,51 +563,51 @@ app.post('/emprestimos', verifyToken, async (req, res) => {
     return;
   }
 
-  const db = await readDb();
-  const usuario = db.usuarios.find((u) => u.id === usuarioId);
-  const livro = db.livros.find((l) => l.id === livroId);
+  // withDbLock garante atomicidade: sem race condition entre múltiplas reservas simultâneas
+  const resultado = await withDbLock(async () => {
+    const db = await readDb();
+    const usuario = db.usuarios.find((u) => u.id === usuarioId);
+    const livro = db.livros.find((l) => l.id === livroId);
 
-  if (!usuario) {
-    res.status(404).json({ erro: 'Usuario nao encontrado.' });
+    if (!usuario) return { status: 404, erro: 'Usuario nao encontrado.' };
+    if (!livro)   return { status: 404, erro: 'Livro nao encontrado.' };
+    if (Number(livro.disponiveis || 0) <= 0)
+      return { status: 409, erro: 'Sem exemplares disponiveis.' };
+
+    const jaTemAtivo = db.emprestimos.some(
+      (e) => e.usuarioId === usuarioId && e.livroId === livroId &&
+             (e.status === 'reservado' || e.status === 'retirado')
+    );
+    if (jaTemAtivo)
+      return { status: 409, erro: 'Usuario ja possui emprestimo ativo deste livro.' };
+
+    livro.disponiveis = Math.max(0, Number(livro.disponiveis || 0) - 1);
+    livro.atualizadoEm = new Date().toISOString();
+
+    const novoEmprestimo = {
+      id: createId(),
+      usuarioId,
+      livroId,
+      usuarioNome: usuario.nome,
+      usuarioTurma: usuario.turma || '',
+      livroTitulo: livro.titulo,
+      livroAutor: livro.autor || '',
+      capa: livro.capa || '',
+      status: 'reservado',
+      renovado: false,
+      dataReserva: new Date().toISOString(),
+    };
+
+    db.emprestimos.push(novoEmprestimo);
+    await writeDb(db);
+    return { status: 201, emprestimo: novoEmprestimo };
+  });
+
+  if (resultado.erro) {
+    res.status(resultado.status).json({ erro: resultado.erro });
     return;
   }
-  if (!livro) {
-    res.status(404).json({ erro: 'Livro nao encontrado.' });
-    return;
-  }
-  if (Number(livro.disponiveis || 0) <= 0) {
-    res.status(409).json({ erro: 'Sem exemplares disponiveis.' });
-    return;
-  }
-
-  const jaTemAtivo = db.emprestimos.some(
-    (e) => e.usuarioId === usuarioId && e.livroId === livroId && (e.status === 'reservado' || e.status === 'retirado')
-  );
-  if (jaTemAtivo) {
-    res.status(409).json({ erro: 'Usuario ja possui emprestimo ativo deste livro.' });
-    return;
-  }
-
-  livro.disponiveis = Math.max(0, Number(livro.disponiveis || 0) - 1);
-  livro.atualizadoEm = new Date().toISOString();
-
-  const novoEmprestimo = {
-    id: createId(),
-    usuarioId,
-    livroId,
-    usuarioNome: usuario.nome,
-    usuarioTurma: usuario.turma || '',
-    livroTitulo: livro.titulo,
-    livroAutor: livro.autor || '',
-    capa: livro.capa || '',
-    status: 'reservado',
-    renovado: false,
-    dataReserva: new Date().toISOString(),
-  };
-
-  db.emprestimos.push(novoEmprestimo);
-  await writeDb(db);
-  res.status(201).json(novoEmprestimo);
+  res.status(201).json(resultado.emprestimo);
 });
 
 // Gerar QR de retirada: dono do empréstimo ou bibliotecario
