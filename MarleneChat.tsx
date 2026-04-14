@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
-  StyleSheet, ActivityIndicator, Animated, KeyboardAvoidingView, Platform,
+  StyleSheet, ActivityIndicator, Animated, KeyboardAvoidingView, Platform, Keyboard,
 } from 'react-native';
 
 const CORES = {
