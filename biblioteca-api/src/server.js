@@ -1022,43 +1022,55 @@ app.post('/api/marlene', verifyToken, async (req, res) => {
   }
 });
 
-// ── Reparo de dados: remove empréstimos órfãos (usuarioId inválido) ───────────
-// Endpoint temporário — apenas bibliotecário pode usar
+// ── Reparo de dados ───────────────────────────────────────────────────────────
+// Remove empréstimos órfãos e corrige disponiveis negativo/inconsistente
 app.post('/admin/reparar-emprestimos', verifyToken, requirePerfil('bibliotecario'), async (req, res) => {
-  const db = await readDb();
+  const resultado = await withDbLock(async () => {
+    const db = await readDb();
 
-  const orfaos = db.emprestimos.filter(
-    (e) => e.usuarioId === undefined || e.usuarioId === null || e.usuarioId === ''
-  );
-
-  if (orfaos.length === 0) {
-    return res.json({ reparados: 0, mensagem: 'Nenhum empréstimo órfão encontrado.' });
-  }
-
-  // Devolve os exemplares dos livros afetados antes de remover
-  for (const emp of orfaos) {
-    if (emp.status === 'reservado' || emp.status === 'retirado') {
-      const livro = db.livros.find((l) => l.id === emp.livroId);
-      if (livro) {
-        livro.disponiveis = Math.min((livro.disponiveis || 0) + 1, livro.totalExemplares || 1);
-        livro.atualizadoEm = new Date().toISOString();
+    // 1. Remove empréstimos sem usuário válido
+    const orfaos = db.emprestimos.filter(
+      (e) => e.usuarioId === undefined || e.usuarioId === null || e.usuarioId === ''
+    );
+    for (const emp of orfaos) {
+      if (emp.status === 'reservado' || emp.status === 'retirado') {
+        const livro = db.livros.find((l) => l.id === emp.livroId);
+        if (livro) {
+          livro.disponiveis = Math.min((livro.disponiveis || 0) + 1, livro.totalExemplares || 1);
+          livro.atualizadoEm = new Date().toISOString();
+        }
       }
     }
-  }
+    db.emprestimos = db.emprestimos.filter(
+      (e) => e.usuarioId !== undefined && e.usuarioId !== null && e.usuarioId !== ''
+    );
 
-  // Remove os empréstimos órfãos
-  db.emprestimos = db.emprestimos.filter(
-    (e) => e.usuarioId !== undefined && e.usuarioId !== null && e.usuarioId !== ''
-  );
+    // 2. Recalcula disponiveis de cada livro a partir dos empréstimos ativos reais
+    let negativosCorrigidos = 0;
+    for (const livro of db.livros) {
+      const emprestadosAtivos = db.emprestimos.filter(
+        (e) => e.livroId === livro.id && (e.status === 'reservado' || e.status === 'retirado')
+      ).length;
+      const total = Number(livro.totalExemplares || 0);
+      const correto = Math.max(0, total - emprestadosAtivos);
+      if ((livro.disponiveis || 0) !== correto) {
+        livro.disponiveis = correto;
+        livro.atualizadoEm = new Date().toISOString();
+        negativosCorrigidos++;
+      }
+    }
 
-  await writeDb(db);
-
-  console.log(`[Reparo] ${orfaos.length} empréstimo(s) órfão(s) removido(s).`);
-  res.json({
-    reparados: orfaos.length,
-    mensagem: `${orfaos.length} empréstimo(s) sem dono removido(s) e exemplares devolvidos ao acervo.`,
-    detalhes: orfaos.map((e) => ({ id: e.id, livroId: e.livroId, status: e.status })),
+    await writeDb(db);
+    return { orfaos: orfaos.length, negativosCorrigidos };
   });
+
+  const msg = [
+    resultado.orfaos > 0 ? `${resultado.orfaos} empréstimo(s) órfão(s) removido(s)` : null,
+    resultado.negativosCorrigidos > 0 ? `${resultado.negativosCorrigidos} livro(s) com estoque corrigido` : null,
+  ].filter(Boolean).join('. ') || 'Dados já consistentes.';
+
+  console.log(`[Reparo] ${msg}`);
+  res.json({ reparados: resultado.orfaos, negativosCorrigidos: resultado.negativosCorrigidos, mensagem: msg });
 });
 
 // ── Comunicados ───────────────────────────────────────────────────────────────
