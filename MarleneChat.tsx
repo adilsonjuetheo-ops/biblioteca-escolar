@@ -243,10 +243,10 @@ const s = StyleSheet.create({
   container: {
     position: 'absolute',
     left: 0, right: 0,
+    top: '20%',
     backgroundColor: CORES.parch,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    height: '80%',
   },
   header: {
     flexDirection: 'row',
