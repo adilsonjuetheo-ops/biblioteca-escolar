@@ -142,7 +142,7 @@ export default function MarleneChat({ livro, acervo = [], token, onFechar }: Pro
 
   return (
     <Animated.View style={[s.overlay, { opacity: fadeAnim }]}>
-      <Animated.View style={[s.container, { bottom: kbAnim, transform: [{ translateY: slideAnim }] }]}>
+      <Animated.View style={[s.container, { bottom: kbAnim }]}>
         <View style={s.header}>
           <View style={s.headerLeft}>
             <View style={s.avatar}>
