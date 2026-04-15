@@ -14,7 +14,8 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "br.com.adilsondev.bibliotecabmsq"
+      "bundleIdentifier": "br.com.adilsondev.bibliotecabmsq",
+      "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {
