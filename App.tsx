@@ -2224,6 +2224,9 @@ export default function App() {
           <TouchableOpacity style={s.logoutBtn} onPress={handleLogout}>
             <Text style={s.logoutText}>Sair da conta</Text>
           </TouchableOpacity>
+          <TouchableOpacity style={s.deleteAccountBtn} onPress={handleExcluirConta}>
+            <Text style={s.deleteAccountText}>Excluir minha conta</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     );
