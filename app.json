@@ -17,7 +17,10 @@
       "bundleIdentifier": "br.com.adilsondev.bibliotecabmsq",
       "buildNumber": "1",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "A câmera é utilizada para fotografar capas de livros, permitindo que a IA identifique automaticamente o título, autor e demais dados da obra.",
+        "NSPhotoLibraryUsageDescription": "O acesso à galeria é utilizado para selecionar a foto da capa de um livro ao cadastrá-lo no acervo.",
+        "NSMicrophoneUsageDescription": "O microfone pode ser acessado pela câmera durante o uso do recurso de fotografar capas de livros."
       }
     },
     "android": {
