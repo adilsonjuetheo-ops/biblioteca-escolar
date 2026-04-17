@@ -313,6 +313,19 @@ app.post('/usuarios/login', async (req, res) => {
   res.json({ ...toPublicUser(usuario), token });
 });
 
+app.delete('/usuarios/me', verifyToken, async (req, res) => {
+  const { id } = req.usuario;
+  await withDbLock(async () => {
+    const db = await readDb();
+    db.usuarios = db.usuarios.filter((u) => u.id !== id);
+    db.emprestimos = (db.emprestimos || []).filter((e) => e.usuarioId !== id);
+    db.desejos = (db.desejos || []).filter((d) => d.usuarioId !== id);
+    db.avaliacoes = (db.avaliacoes || []).filter((a) => a.usuarioId !== id);
+    await writeDb(db);
+  });
+  res.json({ ok: true });
+});
+
 app.post('/usuarios/recuperar-senha', async (req, res) => {
   const { email } = req.body || {};
   const emailNormalizado = normalizeEmail(email);
