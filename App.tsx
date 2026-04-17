@@ -1169,9 +1169,8 @@ export default function App() {
 
   if (tela === 'cadastroAluno') {
     return (
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <SafeAreaView style={s.container}>
-        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={true}>
           <TouchableOpacity onPress={() => setTela('login')} style={s.voltarBtn}>
             <Text style={s.voltarText}>← Voltar</Text>
           </TouchableOpacity>
