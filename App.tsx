@@ -1015,7 +1015,7 @@ export default function App() {
                 setTelaComunicadosPerfil(false);
                 setTela('login'); setEmail(''); setSenha(''); setErro('');
                 setLivros([]); setEmprestimosAtivos([]); setHistorico([]);
-                setUsuarios([]); setDesejos([]);
+                setDesejos([]);
               }},
             ]
           );
