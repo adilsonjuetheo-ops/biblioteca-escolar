@@ -992,6 +992,36 @@ export default function App() {
     }
   }
 
+  function handleExcluirConta() {
+    Alert.alert(
+      'Excluir conta',
+      'Tem certeza? Todos os seus dados serão apagados permanentemente: histórico, reservas e lista de desejos. Esta ação não pode ser desfeita.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Excluir definitivamente', style: 'destructive', onPress: () => {
+          Alert.alert(
+            'Confirmar exclusão',
+            'Esta é sua última chance. Ao confirmar, sua conta será excluída permanentemente.',
+            [
+              { text: 'Cancelar', style: 'cancel' },
+              { text: 'Sim, excluir minha conta', style: 'destructive', onPress: async () => {
+                try {
+                  await axios.delete(`${API_URL}/usuarios/me`, { headers: { Authorization: `Bearer ${tokenRef.current}` } });
+                } catch (_) {}
+                setToken('');
+                setTelaHistorico(false);
+                setTelaComunicadosPerfil(false);
+                setTela('login'); setEmail(''); setSenha(''); setErro('');
+                setLivros([]); setEmprestimosAtivos([]); setHistorico([]);
+                setUsuarios([]); setDesejos([]);
+              }},
+            ]
+          );
+        }},
+      ]
+    );
+  }
+
   function handleLogout() {
     Alert.alert('Sair', 'Deseja sair da conta?', [
       { text: 'Cancelar', style: 'cancel' },
