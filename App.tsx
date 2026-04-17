@@ -228,6 +228,8 @@ const s = StyleSheet.create({
   menuArrow: { color: CORES.muted, fontSize: 20 },
   logoutBtn: { marginTop: 20, height: 50, borderRadius: 12, borderWidth: 1.5, borderColor: CORES.amber, alignItems: 'center', justifyContent: 'center' },
   logoutText: { color: CORES.amber, fontSize: 15, fontWeight: '600' },
+  deleteAccountBtn: { marginTop: 12, height: 50, borderRadius: 12, borderWidth: 1.5, borderColor: CORES.rust, alignItems: 'center', justifyContent: 'center' },
+  deleteAccountText: { color: CORES.rust, fontSize: 15, fontWeight: '600' },
   tabBar: { flexDirection: 'row', backgroundColor: CORES.card, borderTopWidth: 1, borderTopColor: CORES.border, paddingBottom: 4 },
   tabItem: { flex: 1, alignItems: 'center', paddingVertical: 10, gap: 3 },
   tabLabel: { fontSize: 10, color: CORES.muted, fontWeight: '500' },
