@@ -77,6 +77,12 @@ function isEmailEscolar(email) {
   return email.endsWith(DOMINIO_ALUNO) || email.endsWith(DOMINIO_PROFESSOR);
 }
 
+function getPerfilFromEmail(email) {
+  if (email.endsWith(DOMINIO_ALUNO)) return 'aluno';
+  if (email.endsWith(DOMINIO_PROFESSOR)) return 'professor';
+  return null;
+}
+
 function hashCode(code) {
   return crypto.createHash('sha256').update(code).digest('hex');
 }
@@ -212,7 +218,6 @@ app.get('/health', (_, res) => {
 // Cadastro — perfil restrito a 'aluno' e 'professor' (nunca 'bibliotecario')
 app.post('/usuarios', async (req, res) => {
   const { nome, email, senha, matricula = '', turma = '' } = req.body || {};
-  // O perfil é determinado pelo domínio do e-mail, não pelo cliente
   const emailNormalizado = normalizeEmail(email);
 
   if (!nome || !emailNormalizado || !senha) {
@@ -220,11 +225,17 @@ app.post('/usuarios', async (req, res) => {
     return;
   }
 
-  const perfil = String(req.body?.perfil || '').trim();
-  if (perfil !== 'aluno' && perfil !== 'professor') {
-    res.status(400).json({ erro: 'Perfil invalido. Use aluno ou professor.' });
+  const perfilInformado = String(req.body?.perfil || '').trim();
+  const perfilPorDominio = getPerfilFromEmail(emailNormalizado);
+  if (!perfilPorDominio) {
+    res.status(400).json({ erro: 'Use um e-mail institucional válido para cadastro.' });
     return;
   }
+  if (perfilInformado && perfilInformado !== perfilPorDominio) {
+    res.status(400).json({ erro: 'O perfil informado não corresponde ao domínio do e-mail.' });
+    return;
+  }
+  const perfil = perfilPorDominio;
 
   const nomeStr = String(nome).trim().slice(0, 150);
   if (!nomeStr) {
@@ -358,17 +369,19 @@ app.post('/usuarios/recuperar-senha', async (req, res) => {
   }
 
   const codigo = createCode();
-  const registro = {
-    id: createId(),
-    email: emailNormalizado,
-    codigoHash: hashCode(codigo),
-    criadoEm: new Date(agora).toISOString(),
-    expiraEm: new Date(agora + RECOVERY_EXP_MINUTES * 60 * 1000).toISOString(),
-    usadoEm: null,
-  };
-
-  db.recuperacoes.push(registro);
-  await writeDb(db);
+  await withDbLock(async () => {
+    const dbAtual = await readDb();
+    const registro = {
+      id: createId(),
+      email: emailNormalizado,
+      codigoHash: hashCode(codigo),
+      criadoEm: new Date(agora).toISOString(),
+      expiraEm: new Date(agora + RECOVERY_EXP_MINUTES * 60 * 1000).toISOString(),
+      usadoEm: null,
+    };
+    dbAtual.recuperacoes.push(registro);
+    await writeDb(dbAtual);
+  });
 
   const mailResult = await sendRecoveryCode({
     to: emailNormalizado,
@@ -407,33 +420,39 @@ app.post('/usuarios/redefinir-senha', async (req, res) => {
     return;
   }
 
-  const db = await readDb();
-  const usuario = db.usuarios.find((u) => u.email === emailNormalizado);
-  if (!usuario) {
-    res.status(400).json({ erro: 'Codigo invalido ou expirado.' });
+  const resultado = await withDbLock(async () => {
+    const db = await readDb();
+    const usuario = db.usuarios.find((u) => u.email === emailNormalizado);
+    if (!usuario) {
+      return { status: 400, erro: 'Codigo invalido ou expirado.' };
+    }
+
+    const agora = Date.now();
+    const recuperacaoValida = db.recuperacoes
+      .filter((r) => r.email === emailNormalizado && !r.usadoEm)
+      .sort((a, b) => new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime())
+      .find((r) => {
+        const aindaValido = new Date(r.expiraEm).getTime() >= agora;
+        const mesmoCodigo = r.codigoHash === hashCode(String(codigo).trim());
+        return aindaValido && mesmoCodigo;
+      });
+
+    if (!recuperacaoValida) {
+      return { status: 400, erro: 'Codigo invalido ou expirado.' };
+    }
+
+    usuario.senhaHash = await bcrypt.hash(String(novaSenha), 10);
+    usuario.atualizadoEm = new Date().toISOString();
+    recuperacaoValida.usadoEm = new Date().toISOString();
+
+    await writeDb(db);
+    return { status: 200 };
+  });
+
+  if (resultado.erro) {
+    res.status(resultado.status).json({ erro: resultado.erro });
     return;
   }
-
-  const agora = Date.now();
-  const recuperacaoValida = db.recuperacoes
-    .filter((r) => r.email === emailNormalizado && !r.usadoEm)
-    .sort((a, b) => new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime())
-    .find((r) => {
-      const aindaValido = new Date(r.expiraEm).getTime() >= agora;
-      const mesmoCodigo = r.codigoHash === hashCode(String(codigo).trim());
-      return aindaValido && mesmoCodigo;
-    });
-
-  if (!recuperacaoValida) {
-    res.status(400).json({ erro: 'Codigo invalido ou expirado.' });
-    return;
-  }
-
-  usuario.senhaHash = await bcrypt.hash(String(novaSenha), 10);
-  usuario.atualizadoEm = new Date().toISOString();
-  recuperacaoValida.usadoEm = new Date().toISOString();
-
-  await writeDb(db);
   res.json({ mensagem: 'Senha redefinida com sucesso.' });
 });
 
@@ -454,89 +473,104 @@ app.post('/livros', verifyToken, requirePerfil('bibliotecario'), async (req, res
     return;
   }
 
-  const db = await readDb();
-  const existente = db.livros.find((l) =>
-    String(l.titulo || '').trim().toLowerCase() === livro.titulo.toLowerCase() &&
-    String(l.autor || '').trim().toLowerCase() === livro.autor.toLowerCase()
-  );
+  const resultado = await withDbLock(async () => {
+    const db = await readDb();
+    const existente = db.livros.find((l) =>
+      String(l.titulo || '').trim().toLowerCase() === livro.titulo.toLowerCase() &&
+      String(l.autor || '').trim().toLowerCase() === livro.autor.toLowerCase()
+    );
 
-  if (existente) {
-    const emprestados = Math.max(0, Number(existente.totalExemplares || 0) - Number(existente.disponiveis || 0));
-    const novoTotal = Math.max(0, Number(livro.totalExemplares || 0));
+    if (existente) {
+      const emprestados = Math.max(0, Number(existente.totalExemplares || 0) - Number(existente.disponiveis || 0));
+      const novoTotal = Math.max(0, Number(livro.totalExemplares || 0));
 
-    existente.titulo = livro.titulo || existente.titulo;
-    existente.autor = livro.autor || existente.autor;
-    existente.genero = livro.genero || existente.genero;
-    existente.capa = livro.capa || existente.capa;
-    existente.sinopse = livro.sinopse || existente.sinopse;
-    existente.totalExemplares = novoTotal;
-    existente.disponiveis = Math.max(0, novoTotal - emprestados);
-    existente.atualizadoEm = new Date().toISOString();
+      existente.titulo = livro.titulo || existente.titulo;
+      existente.autor = livro.autor || existente.autor;
+      existente.genero = livro.genero || existente.genero;
+      existente.capa = livro.capa || existente.capa;
+      existente.sinopse = livro.sinopse || existente.sinopse;
+      existente.totalExemplares = novoTotal;
+      existente.disponiveis = Math.max(0, novoTotal - emprestados);
+      existente.atualizadoEm = new Date().toISOString();
 
+      await writeDb(db);
+      return { status: 200, livro: existente };
+    }
+
+    const novoLivro = {
+      id: createId(),
+      ...livro,
+      criadoEm: new Date().toISOString(),
+    };
+
+    db.livros.push(novoLivro);
     await writeDb(db);
-    res.status(200).json(existente);
-    return;
-  }
+    return { status: 201, livro: novoLivro };
+  });
 
-  const novoLivro = {
-    id: createId(),
-    ...livro,
-    criadoEm: new Date().toISOString(),
-  };
-
-  db.livros.push(novoLivro);
-  await writeDb(db);
-  res.status(201).json(novoLivro);
+  res.status(resultado.status).json(resultado.livro);
 });
 
 // Editar livro: somente bibliotecario
 app.patch('/livros/:id', verifyToken, requirePerfil('bibliotecario'), async (req, res) => {
   const { id } = req.params;
-  const db = await readDb();
-  const livro = db.livros.find((l) => l.id === id);
+  const resultado = await withDbLock(async () => {
+    const db = await readDb();
+    const livro = db.livros.find((l) => l.id === id);
 
-  if (!livro) {
-    res.status(404).json({ erro: 'Livro nao encontrado.' });
-    return;
-  }
+    if (!livro) {
+      return { status: 404, erro: 'Livro nao encontrado.' };
+    }
 
-  const updates = normalizeLivroPayload({
-    ...livro,
-    ...req.body,
+    const updates = normalizeLivroPayload({
+      ...livro,
+      ...req.body,
+    });
+
+    if (!updates.titulo) {
+      return { status: 400, erro: 'titulo e obrigatorio.' };
+    }
+
+    Object.assign(livro, updates, { atualizadoEm: new Date().toISOString() });
+    await writeDb(db);
+    return { status: 200, livro };
   });
 
-  if (!updates.titulo) {
-    res.status(400).json({ erro: 'titulo e obrigatorio.' });
+  if (resultado.erro) {
+    res.status(resultado.status).json({ erro: resultado.erro });
     return;
   }
-
-  Object.assign(livro, updates, { atualizadoEm: new Date().toISOString() });
-  await writeDb(db);
-  res.json(livro);
+  res.json(resultado.livro);
 });
 
 // Remover livro: somente bibliotecario
 app.delete('/livros/:id', verifyToken, requirePerfil('bibliotecario'), async (req, res) => {
   const { id } = req.params;
-  const db = await readDb();
+  const resultado = await withDbLock(async () => {
+    const db = await readDb();
 
-  const ativo = db.emprestimos.some(
-    (e) => e.livroId === id && (e.status === 'reservado' || e.status === 'retirado')
-  );
-  if (ativo) {
-    res.status(409).json({ erro: 'Nao e possivel remover livro com emprestimo ativo.' });
+    const ativo = db.emprestimos.some(
+      (e) => e.livroId === id && (e.status === 'reservado' || e.status === 'retirado')
+    );
+    if (ativo) {
+      return { status: 409, erro: 'Nao e possivel remover livro com emprestimo ativo.' };
+    }
+
+    const idx = db.livros.findIndex((l) => l.id === id);
+    if (idx === -1) {
+      return { status: 404, erro: 'Livro nao encontrado.' };
+    }
+
+    db.livros.splice(idx, 1);
+    db.desejos = (db.desejos || []).filter((d) => d.livroId !== id);
+    await writeDb(db);
+    return { status: 204 };
+  });
+
+  if (resultado.erro) {
+    res.status(resultado.status).json({ erro: resultado.erro });
     return;
   }
-
-  const idx = db.livros.findIndex((l) => l.id === id);
-  if (idx === -1) {
-    res.status(404).json({ erro: 'Livro nao encontrado.' });
-    return;
-  }
-
-  db.livros.splice(idx, 1);
-  db.desejos = (db.desejos || []).filter((d) => d.livroId !== id);
-  await writeDb(db);
   res.status(204).end();
 });
 
@@ -681,118 +715,141 @@ app.patch('/emprestimos/retirada-qr', verifyToken, requirePerfil('bibliotecario'
     ? codigoOuPayload.split(':').pop()
     : codigoOuPayload;
 
-  const db = await readDb();
-  const agora = Date.now();
+  const resultado = await withDbLock(async () => {
+    const db = await readDb();
+    const agora = Date.now();
 
-  const emprestimo = db.emprestimos.find((e) => {
-    if (e.status !== 'reservado') return false;
-    if (!e.retiradaQrCodigo) return false;
-    if (e.retiradaQrCodigo !== codigo) return false;
-    if (!e.retiradaQrExpiraEm) return false;
-    return new Date(e.retiradaQrExpiraEm).getTime() >= agora;
+    const emprestimo = db.emprestimos.find((e) => {
+      if (e.status !== 'reservado') return false;
+      if (!e.retiradaQrCodigo) return false;
+      if (e.retiradaQrCodigo !== codigo) return false;
+      if (!e.retiradaQrExpiraEm) return false;
+      return new Date(e.retiradaQrExpiraEm).getTime() >= agora;
+    });
+
+    if (!emprestimo) {
+      return { status: 400, erro: 'QR invalido ou expirado.' };
+    }
+
+    emprestimo.status = 'retirado';
+    emprestimo.dataRetirada = new Date().toISOString();
+    emprestimo.retiradaQrUsadoEm = new Date().toISOString();
+    emprestimo.atualizadoEm = new Date().toISOString();
+
+    await writeDb(db);
+    return { status: 200, emprestimo };
   });
 
-  if (!emprestimo) {
-    res.status(400).json({ erro: 'QR invalido ou expirado.' });
+  if (resultado.erro) {
+    res.status(resultado.status).json({ erro: resultado.erro });
     return;
   }
-
-  emprestimo.status = 'retirado';
-  emprestimo.dataRetirada = new Date().toISOString();
-  emprestimo.retiradaQrUsadoEm = new Date().toISOString();
-  emprestimo.atualizadoEm = new Date().toISOString();
-
-  await writeDb(db);
   res.json({
     mensagem: 'Retirada confirmada por QR.',
-    emprestimo,
+    emprestimo: resultado.emprestimo,
   });
 });
 
 // Retirada manual: somente bibliotecario
 app.patch('/emprestimos/:id/retirar', verifyToken, requirePerfil('bibliotecario'), async (req, res) => {
   const { id } = req.params;
-  const db = await readDb();
-  const emprestimo = db.emprestimos.find((e) => e.id === id);
+  const resultado = await withDbLock(async () => {
+    const db = await readDb();
+    const emprestimo = db.emprestimos.find((e) => e.id === id);
 
-  if (!emprestimo) {
-    res.status(404).json({ erro: 'Emprestimo nao encontrado.' });
+    if (!emprestimo) {
+      return { status: 404, erro: 'Emprestimo nao encontrado.' };
+    }
+    if (emprestimo.status !== 'reservado') {
+      return { status: 409, erro: 'Apenas emprestimos reservados podem ser retirados.' };
+    }
+
+    invalidatePickupQr(emprestimo, 'retirada-manual');
+    emprestimo.status = 'retirado';
+    emprestimo.dataRetirada = new Date().toISOString();
+    emprestimo.atualizadoEm = new Date().toISOString();
+    await writeDb(db);
+    return { status: 200, emprestimo };
+  });
+
+  if (resultado.erro) {
+    res.status(resultado.status).json({ erro: resultado.erro });
     return;
   }
-  if (emprestimo.status !== 'reservado') {
-    res.status(409).json({ erro: 'Apenas emprestimos reservados podem ser retirados.' });
-    return;
-  }
-
-  invalidatePickupQr(emprestimo, 'retirada-manual');
-  emprestimo.status = 'retirado';
-  emprestimo.dataRetirada = new Date().toISOString();
-  emprestimo.atualizadoEm = new Date().toISOString();
-  await writeDb(db);
-  res.json(emprestimo);
+  res.json(resultado.emprestimo);
 });
 
 // Renovar: dono do empréstimo ou bibliotecario
 app.patch('/emprestimos/:id/renovar', verifyToken, async (req, res) => {
   const { id } = req.params;
-  const db = await readDb();
-  const emprestimo = db.emprestimos.find((e) => e.id === id);
-
-  if (!emprestimo) {
-    res.status(404).json({ erro: 'Emprestimo nao encontrado.' });
-    return;
-  }
-
   const { id: reqId, perfil } = req.usuario;
-  if (perfil !== 'bibliotecario' && emprestimo.usuarioId !== reqId) {
-    res.status(403).json({ erro: 'Voce nao pode renovar este emprestimo.' });
-    return;
-  }
+  const resultado = await withDbLock(async () => {
+    const db = await readDb();
+    const emprestimo = db.emprestimos.find((e) => e.id === id);
 
-  if (emprestimo.status === 'devolvido') {
-    res.status(409).json({ erro: 'Emprestimo ja devolvido.' });
-    return;
-  }
-  if (emprestimo.renovado) {
-    res.status(409).json({ erro: 'Emprestimo ja renovado.' });
-    return;
-  }
+    if (!emprestimo) {
+      return { status: 404, erro: 'Emprestimo nao encontrado.' };
+    }
 
-  emprestimo.renovado = true;
-  emprestimo.atualizadoEm = new Date().toISOString();
-  await writeDb(db);
-  res.json(emprestimo);
+    if (perfil !== 'bibliotecario' && emprestimo.usuarioId !== reqId) {
+      return { status: 403, erro: 'Voce nao pode renovar este emprestimo.' };
+    }
+
+    if (emprestimo.status === 'devolvido') {
+      return { status: 409, erro: 'Emprestimo ja devolvido.' };
+    }
+    if (emprestimo.renovado) {
+      return { status: 409, erro: 'Emprestimo ja renovado.' };
+    }
+
+    emprestimo.renovado = true;
+    emprestimo.atualizadoEm = new Date().toISOString();
+    await writeDb(db);
+    return { status: 200, emprestimo };
+  });
+
+  if (resultado.erro) {
+    res.status(resultado.status).json({ erro: resultado.erro });
+    return;
+  }
+  res.json(resultado.emprestimo);
 });
 
 // Devolver: somente bibliotecario
 app.patch('/emprestimos/:id/devolver', verifyToken, requirePerfil('bibliotecario'), async (req, res) => {
   const { id } = req.params;
-  const db = await readDb();
-  const emprestimo = db.emprestimos.find((e) => e.id === id);
+  const resultado = await withDbLock(async () => {
+    const db = await readDb();
+    const emprestimo = db.emprestimos.find((e) => e.id === id);
 
-  if (!emprestimo) {
-    res.status(404).json({ erro: 'Emprestimo nao encontrado.' });
+    if (!emprestimo) {
+      return { status: 404, erro: 'Emprestimo nao encontrado.' };
+    }
+    if (emprestimo.status === 'devolvido') {
+      return { status: 409, erro: 'Emprestimo ja devolvido.' };
+    }
+
+    invalidatePickupQr(emprestimo, 'devolucao');
+    const livro = db.livros.find((l) => l.id === emprestimo.livroId);
+    if (livro) {
+      const total = Number(livro.totalExemplares || 0);
+      const prox = Number(livro.disponiveis || 0) + 1;
+      livro.disponiveis = total > 0 ? Math.min(total, prox) : prox;
+      livro.atualizadoEm = new Date().toISOString();
+    }
+
+    emprestimo.status = 'devolvido';
+    emprestimo.dataDevolucao = new Date().toISOString();
+    emprestimo.atualizadoEm = new Date().toISOString();
+    await writeDb(db);
+    return { status: 200, emprestimo };
+  });
+
+  if (resultado.erro) {
+    res.status(resultado.status).json({ erro: resultado.erro });
     return;
   }
-  if (emprestimo.status === 'devolvido') {
-    res.status(409).json({ erro: 'Emprestimo ja devolvido.' });
-    return;
-  }
-
-  invalidatePickupQr(emprestimo, 'devolucao');
-  const livro = db.livros.find((l) => l.id === emprestimo.livroId);
-  if (livro) {
-    const total = Number(livro.totalExemplares || 0);
-    const prox = Number(livro.disponiveis || 0) + 1;
-    livro.disponiveis = total > 0 ? Math.min(total, prox) : prox;
-    livro.atualizadoEm = new Date().toISOString();
-  }
-
-  emprestimo.status = 'devolvido';
-  emprestimo.dataDevolucao = new Date().toISOString();
-  emprestimo.atualizadoEm = new Date().toISOString();
-  await writeDb(db);
-  res.json(emprestimo);
+  res.json(resultado.emprestimo);
 });
 
 // ── Rotas de avaliações ───────────────────────────────────────────────────────
@@ -818,50 +875,54 @@ app.post('/avaliacoes', verifyToken, async (req, res) => {
     return;
   }
 
-  const db = await readDb();
-  if (!db.avaliacoes) db.avaliacoes = [];
+  const resultado = await withDbLock(async () => {
+    const db = await readDb();
+    if (!db.avaliacoes) db.avaliacoes = [];
 
-  const usuario = db.usuarios.find((u) => u.id === usuarioId);
-  if (!usuario) {
-    res.status(404).json({ erro: 'Usuario nao encontrado.' });
+    const usuario = db.usuarios.find((u) => u.id === usuarioId);
+    if (!usuario) {
+      return { status: 404, erro: 'Usuario nao encontrado.' };
+    }
+
+    const livro = db.livros.find((l) => l.id === livroId);
+    if (!livro) {
+      return { status: 404, erro: 'Livro nao encontrado.' };
+    }
+
+    const temEmprestimoDevolvido = db.emprestimos.some(
+      (e) => e.usuarioId === usuarioId && e.livroId === livroId && e.status === 'devolvido'
+    );
+    if (!temEmprestimoDevolvido) {
+      return { status: 403, erro: 'Voce so pode avaliar livros que ja devolveu.' };
+    }
+
+    const jaAvaliou = db.avaliacoes.some((a) => a.usuarioId === usuarioId && a.livroId === livroId);
+    if (jaAvaliou) {
+      return { status: 409, erro: 'Voce ja avaliou este livro.' };
+    }
+
+    const novaAvaliacao = {
+      id: createId(),
+      usuarioId,
+      livroId,
+      usuarioNome: usuario.nome,
+      livroTitulo: livro.titulo,
+      nota: notaNum,
+      resenha: String(resenha || '').trim().slice(0, 1000),
+      criadoEm: new Date().toISOString(),
+    };
+
+    db.avaliacoes.push(novaAvaliacao);
+    await writeDb(db);
+
+    return { status: 201, avaliacao: novaAvaliacao };
+  });
+
+  if (resultado.erro) {
+    res.status(resultado.status).json({ erro: resultado.erro });
     return;
   }
-
-  const livro = db.livros.find((l) => l.id === livroId);
-  if (!livro) {
-    res.status(404).json({ erro: 'Livro nao encontrado.' });
-    return;
-  }
-
-  const temEmprestimoDevolvido = db.emprestimos.some(
-    (e) => e.usuarioId === usuarioId && e.livroId === livroId && e.status === 'devolvido'
-  );
-  if (!temEmprestimoDevolvido) {
-    res.status(403).json({ erro: 'Voce so pode avaliar livros que ja devolveu.' });
-    return;
-  }
-
-  const jaAvaliou = db.avaliacoes.some((a) => a.usuarioId === usuarioId && a.livroId === livroId);
-  if (jaAvaliou) {
-    res.status(409).json({ erro: 'Voce ja avaliou este livro.' });
-    return;
-  }
-
-  const novaAvaliacao = {
-    id: createId(),
-    usuarioId,
-    livroId,
-    usuarioNome: usuario.nome,
-    livroTitulo: livro.titulo,
-    nota: notaNum,
-    resenha: String(resenha || '').trim().slice(0, 1000),
-    criadoEm: new Date().toISOString(),
-  };
-
-  db.avaliacoes.push(novaAvaliacao);
-  await writeDb(db);
-
-  res.status(201).json(novaAvaliacao);
+  res.status(201).json(resultado.avaliacao);
 });
 
 // ── Rotas de lista de desejos ─────────────────────────────────────────────────
@@ -890,51 +951,66 @@ app.post('/desejos', verifyToken, async (req, res) => {
     return;
   }
 
-  const db = await readDb();
-  if (!db.desejos) db.desejos = [];
+  const resultado = await withDbLock(async () => {
+    const db = await readDb();
+    if (!db.desejos) db.desejos = [];
 
-  const usuario = db.usuarios.find((u) => u.id === usuarioId);
-  if (!usuario) { res.status(404).json({ erro: 'Usuario nao encontrado.' }); return; }
+    const usuario = db.usuarios.find((u) => u.id === usuarioId);
+    if (!usuario) return { status: 404, erro: 'Usuario nao encontrado.' };
 
-  const livro = db.livros.find((l) => l.id === livroId);
-  if (!livro) { res.status(404).json({ erro: 'Livro nao encontrado.' }); return; }
+    const livro = db.livros.find((l) => l.id === livroId);
+    if (!livro) return { status: 404, erro: 'Livro nao encontrado.' };
 
-  const jaExiste = db.desejos.find((d) => d.usuarioId === usuarioId && d.livroId === livroId);
-  if (jaExiste) { res.status(409).json({ erro: 'Livro ja esta na lista de desejos.' }); return; }
+    const jaExiste = db.desejos.find((d) => d.usuarioId === usuarioId && d.livroId === livroId);
+    if (jaExiste) return { status: 409, erro: 'Livro ja esta na lista de desejos.' };
 
-  const novo = {
-    id: createId(),
-    usuarioId,
-    livroId,
-    livroTitulo: livro.titulo,
-    livroAutor: livro.autor || '',
-    livroGenero: livro.genero || '',
-    livroCapa: livro.capa || '',
-    criadoEm: new Date().toISOString(),
-  };
-  db.desejos.push(novo);
-  await writeDb(db);
-  res.status(201).json(novo);
+    const novo = {
+      id: createId(),
+      usuarioId,
+      livroId,
+      livroTitulo: livro.titulo,
+      livroAutor: livro.autor || '',
+      livroGenero: livro.genero || '',
+      livroCapa: livro.capa || '',
+      criadoEm: new Date().toISOString(),
+    };
+    db.desejos.push(novo);
+    await writeDb(db);
+    return { status: 201, desejo: novo };
+  });
+
+  if (resultado.erro) {
+    res.status(resultado.status).json({ erro: resultado.erro });
+    return;
+  }
+  res.status(201).json(resultado.desejo);
 });
 
 // Remover: somente o dono ou bibliotecario
 app.delete('/desejos/:id', verifyToken, async (req, res) => {
   const { id } = req.params;
   const { id: reqId, perfil } = req.usuario;
-  const db = await readDb();
-  if (!db.desejos) db.desejos = [];
+  const resultado = await withDbLock(async () => {
+    const db = await readDb();
+    if (!db.desejos) db.desejos = [];
 
-  const idx = db.desejos.findIndex((d) => d.id === id);
-  if (idx === -1) { res.status(404).json({ erro: 'Item nao encontrado.' }); return; }
+    const idx = db.desejos.findIndex((d) => d.id === id);
+    if (idx === -1) return { status: 404, erro: 'Item nao encontrado.' };
 
-  const desejo = db.desejos[idx];
-  if (perfil !== 'bibliotecario' && desejo.usuarioId !== reqId) {
-    res.status(403).json({ erro: 'Voce nao pode remover este item.' });
+    const desejo = db.desejos[idx];
+    if (perfil !== 'bibliotecario' && desejo.usuarioId !== reqId) {
+      return { status: 403, erro: 'Voce nao pode remover este item.' };
+    }
+
+    db.desejos.splice(idx, 1);
+    await writeDb(db);
+    return { status: 204 };
+  });
+
+  if (resultado.erro) {
+    res.status(resultado.status).json({ erro: resultado.erro });
     return;
   }
-
-  db.desejos.splice(idx, 1);
-  await writeDb(db);
   res.status(204).end();
 });
 
@@ -1099,27 +1175,34 @@ app.post('/comunicados', verifyToken, requirePerfil('bibliotecario', 'professor'
     res.status(400).json({ erro: 'titulo e mensagem sao obrigatorios.' });
     return;
   }
-  const db = await readDb();
-  const novo = {
-    id: createId(),
-    titulo: String(titulo).trim().slice(0, 200),
-    mensagem: String(mensagem).trim().slice(0, 2000),
-    tipo: String(tipo).trim().slice(0, 50),
-    autorId: req.usuario.id,
-    autorNome: db.usuarios.find((u) => u.id === req.usuario.id)?.nome || '',
-    criadoEm: new Date().toISOString(),
-  };
-  db.comunicados.push(novo);
-  await writeDb(db);
-  res.status(201).json(novo);
+  const resultado = await withDbLock(async () => {
+    const db = await readDb();
+    const novo = {
+      id: createId(),
+      titulo: String(titulo).trim().slice(0, 200),
+      mensagem: String(mensagem).trim().slice(0, 2000),
+      tipo: String(tipo).trim().slice(0, 50),
+      autorId: req.usuario.id,
+      autorNome: db.usuarios.find((u) => u.id === req.usuario.id)?.nome || '',
+      criadoEm: new Date().toISOString(),
+    };
+    db.comunicados.push(novo);
+    await writeDb(db);
+    return novo;
+  });
+  res.status(201).json(resultado);
 });
 
 app.delete('/comunicados/:id', verifyToken, requirePerfil('bibliotecario'), async (req, res) => {
-  const db = await readDb();
-  const idx = db.comunicados.findIndex((c) => c.id === req.params.id);
-  if (idx === -1) { res.status(404).json({ erro: 'Comunicado nao encontrado.' }); return; }
-  db.comunicados.splice(idx, 1);
-  await writeDb(db);
+  const resultado = await withDbLock(async () => {
+    const db = await readDb();
+    const idx = db.comunicados.findIndex((c) => c.id === req.params.id);
+    if (idx === -1) return { status: 404, erro: 'Comunicado nao encontrado.' };
+    db.comunicados.splice(idx, 1);
+    await writeDb(db);
+    return { status: 204 };
+  });
+  if (resultado.erro) { res.status(resultado.status).json({ erro: resultado.erro }); return; }
   res.status(204).end();
 });
 
@@ -1146,29 +1229,37 @@ app.get('/suspensoes/verificar/:usuarioId', verifyToken, async (req, res) => {
 app.post('/suspensoes', verifyToken, requirePerfil('bibliotecario'), async (req, res) => {
   const { usuarioId, motivo = 'Devolucao em atraso', dias = 7 } = req.body || {};
   if (!usuarioId) { res.status(400).json({ erro: 'usuarioId e obrigatorio.' }); return; }
-  const db = await readDb();
-  const usuario = db.usuarios.find((u) => u.id === usuarioId);
-  if (!usuario) { res.status(404).json({ erro: 'Usuario nao encontrado.' }); return; }
-  const expiraEm = new Date(Date.now() + Number(dias) * 24 * 60 * 60 * 1000).toISOString();
-  const nova = {
-    id: createId(),
-    usuarioId,
-    motivo: String(motivo).trim().slice(0, 300),
-    expiraEm,
-    criadoEm: new Date().toISOString(),
-  };
-  db.suspensoes = (db.suspensoes || []).filter((s) => s.usuarioId !== usuarioId);
-  db.suspensoes.push(nova);
-  await writeDb(db);
-  res.status(201).json(nova);
+  const resultado = await withDbLock(async () => {
+    const db = await readDb();
+    const usuario = db.usuarios.find((u) => u.id === usuarioId);
+    if (!usuario) return { status: 404, erro: 'Usuario nao encontrado.' };
+    const expiraEm = new Date(Date.now() + Number(dias) * 24 * 60 * 60 * 1000).toISOString();
+    const nova = {
+      id: createId(),
+      usuarioId,
+      motivo: String(motivo).trim().slice(0, 300),
+      expiraEm,
+      criadoEm: new Date().toISOString(),
+    };
+    db.suspensoes = (db.suspensoes || []).filter((s) => s.usuarioId !== usuarioId);
+    db.suspensoes.push(nova);
+    await writeDb(db);
+    return { status: 201, suspensao: nova };
+  });
+  if (resultado.erro) { res.status(resultado.status).json({ erro: resultado.erro }); return; }
+  res.status(201).json(resultado.suspensao);
 });
 
 app.delete('/suspensoes/:id', verifyToken, requirePerfil('bibliotecario'), async (req, res) => {
-  const db = await readDb();
-  const idx = (db.suspensoes || []).findIndex((s) => s.id === req.params.id);
-  if (idx === -1) { res.status(404).json({ erro: 'Suspensao nao encontrada.' }); return; }
-  db.suspensoes.splice(idx, 1);
-  await writeDb(db);
+  const resultado = await withDbLock(async () => {
+    const db = await readDb();
+    const idx = (db.suspensoes || []).findIndex((s) => s.id === req.params.id);
+    if (idx === -1) return { status: 404, erro: 'Suspensao nao encontrada.' };
+    db.suspensoes.splice(idx, 1);
+    await writeDb(db);
+    return { status: 204 };
+  });
+  if (resultado.erro) { res.status(resultado.status).json({ erro: resultado.erro }); return; }
   res.status(204).end();
 });
 

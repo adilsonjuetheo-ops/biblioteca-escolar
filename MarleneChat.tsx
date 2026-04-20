@@ -3,6 +3,8 @@ import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
   StyleSheet, ActivityIndicator, Animated, Platform, Keyboard, Dimensions,
 } from 'react-native';
+import { API_ENDPOINTS } from './apiConfig';
+import type { Livro } from './appTypes';
 
 const CORES = {
   ink: '#1a1208', parch: '#f5efe3', warm: '#e8dcc8',
@@ -10,17 +12,12 @@ const CORES = {
   rust: '#b84c2e', muted: '#8a7d68', card: '#fdfaf4', border: '#d9cfbe',
 };
 
-const API_URL = 'https://bibliotecaapi-production-7ee0.up.railway.app/api/marlene';
 const { height: SCREEN_H } = Dimensions.get('window');
 // Altura fixa do container: garante que caiba na tela mesmo com teclado aberto.
 // marginBottom (kbAnim) eleva o container; o topo extra fica oculto fora da tela,
 // mas o campo de input e as mensagens recentes ficam sempre visíveis.
 const CONTAINER_H = Math.round(SCREEN_H * 0.72);
 
-type Livro = {
-  id: string; titulo: string; autor?: string; genero?: string;
-  sinopse?: string; disponiveis?: number; totalExemplares?: number;
-};
 type Mensagem = { role: 'user' | 'assistant'; content: string; };
 type Props = { livro: Livro; acervo?: Livro[]; token?: string; onFechar: () => void; };
 
@@ -112,7 +109,7 @@ export default function MarleneChat({ livro, acervo = [], token, onFechar }: Pro
     setCarregando(true);
 
     try {
-      const response = await fetch(API_URL, {
+      const response = await fetch(API_ENDPOINTS.marlene, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

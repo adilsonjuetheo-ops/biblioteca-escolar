@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, Alert, ScrollView,
@@ -9,8 +8,50 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import MarleneChat from './MarleneChat';
-
-const API_URL = 'https://bibliotecaapi-production-7ee0.up.railway.app';
+import ComunicadosList from './components/ComunicadosList';
+import type {
+  AbaBiblio,
+  AbaProfessor,
+  AbaUsuario,
+  Avaliacao,
+  Comunicado,
+  Desejo,
+  Emprestimo,
+  Livro,
+  Perfil,
+  QrRetirada,
+  ScannerFeedback,
+  Suspensao,
+  Tela,
+  Usuario,
+} from './appTypes';
+import {
+  adicionarDesejo,
+  analisarCapa,
+  aplicarSuspensao,
+  cadastrarUsuario,
+  carregarDadosBiblioteca,
+  criarLivro,
+  atualizarLivro,
+  devolverEmprestimo,
+  enviarAvaliacao,
+  excluirConta,
+  gerarQrRetirada,
+  getApiErrorMessage,
+  listarEmprestimos,
+  login,
+  redefinirSenha,
+  removerDesejo,
+  removerLivro,
+  renovarEmprestimo,
+  repararEmprestimos,
+  reservarLivro,
+  retirarEmprestimo,
+  solicitarRecuperacao,
+  validarQrRetirada,
+  verificarSuspensao,
+} from './services/libraryApi';
+import { setApiAuthToken } from './services/http';
 
 const CORES = {
   ink: '#1a1208',
@@ -29,90 +70,6 @@ const DOMINIO_ALUNO = '@aluno.mg.gov.br';
 const DOMINIO_PROFESSOR = '@educacao.mg.gov.br';
 const ESCOLA = 'E. E. Cel. Jose Venancio de Souza';
 const BIBLIOTECA = 'Biblioteca Marlene de Souza Queiroz';
-
-
-type Perfil = 'aluno' | 'professor' | 'bibliotecario';
-type Tela = 'login' | 'cadastroAluno' | 'cadastroProfessor' | 'esqueci' | 'main' | 'professor' | 'bibliotecario';
-type AbaUsuario = 'home' | 'buscar' | 'historico' | 'livros' | 'avisos' | 'perfil';
-type AbaProfessor = 'home' | 'buscar' | 'reservas' | 'ranking' | 'avisos' | 'perfil';
-type AbaBiblio = 'dashboard' | 'gestao' | 'admin' | 'avisos' | 'perfil';
-
-type Usuario = {
-  id: string;
-  nome: string;
-  email: string;
-  perfil: Perfil;
-  iniciais?: string;
-  turma?: string;
-};
-
-type Livro = {
-  id: string;
-  titulo: string;
-  autor?: string;
-  genero?: string;
-  sinopse?: string;
-  capa?: string;
-  prateleira?: string;
-  totalExemplares?: number;
-  disponiveis: number;
-};
-
-type Emprestimo = {
-  id: string;
-  usuarioId: string;
-  livroId: string;
-  status: 'reservado' | 'retirado' | 'devolvido' | string;
-  livroTitulo?: string;
-  livroAutor?: string;
-  capa?: string;
-  usuarioNome?: string;
-  usuarioTurma?: string;
-  dataReserva?: string;
-  dataDevolucao?: string;
-  renovado?: boolean;
-};
-
-type Avaliacao = {
-  id: string;
-  usuarioId: string;
-  livroId: string;
-  nota: number;
-  texto?: string;
-  resenha?: string;
-  usuarioNome?: string;
-  criadoEm?: string;
-};
-
-type Desejo = {
-  id: string;
-  usuarioId: string;
-  livroId: string;
-  livroTitulo?: string;
-  livroAutor?: string;
-  livroGenero?: string;
-  livroCapa?: string;
-};
-
-type QrRetirada = {
-  codigo?: string;
-  payload?: string;
-  expiraEm?: string;
-};
-
-type ScannerFeedback = {
-  livro: string;
-  usuario: string;
-};
-
-type ApiErro = { erro?: string };
-
-function getApiErrorMessage(err: unknown, fallback: string): string {
-  if (axios.isAxiosError<ApiErro>(err)) {
-    return err.response?.data?.erro || fallback;
-  }
-  return fallback;
-}
 
 function calcularProgresso(emp: Emprestimo): number {
   if (!emp.dataReserva || !emp.dataDevolucao) return 50;
@@ -288,9 +245,13 @@ export default function App() {
   const [historico, setHistorico] = useState<Emprestimo[]>([]);
   const [carregando, setCarregando] = useState(false);
   const [livroSelecionado, setLivroSelecionado] = useState<Livro | null>(null);
+  const [buscaInput, setBuscaInput] = useState('');
   const [buscaTexto, setBuscaTexto] = useState('');
   const [filtroGenero, setFiltroGenero] = useState('todos');
   const [filtroDisp, setFiltroDisp] = useState('todos');
+  const [paginaLivros, setPaginaLivros] = useState(1);
+  const [paginaHome, setPaginaHome] = useState(1);
+  const [paginaHomeProfessor, setPaginaHomeProfessor] = useState(1);
 
   const [todasAvaliacoes, setTodasAvaliacoes] = useState<Avaliacao[]>([]);
   const [telaResenha, setTelaResenha] = useState(false);
@@ -346,8 +307,8 @@ export default function App() {
   const [scannerFeedback, setScannerFeedback] = useState<ScannerFeedback | null>(null);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [erroConexao, setErroConexao] = useState(false);
-  const [suspensoes, setSuspensoes] = useState<any[]>([]);
-  const [comunicados, setComunicados] = useState<any[]>([]);
+  const [suspensoes, setSuspensoes] = useState<Suspensao[]>([]);
+  const [comunicados, setComunicados] = useState<Comunicado[]>([]);
 
   const [agora, setAgora] = useState(Date.now());
 
@@ -378,24 +339,14 @@ export default function App() {
     return () => clearInterval(clockTimer);
   }, []);
 
-  // Ref para guardar o token — garante que o interceptor sempre usa o valor mais atual
-  const tokenRef = React.useRef<string>('');
+  const buscaTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Atualiza a ref sempre que o token mudar
   React.useEffect(() => {
-    tokenRef.current = token;
+    setApiAuthToken(token);
   }, [token]);
 
-  // Configura o interceptor uma única vez — usa a ref para sempre ter o token atualizado
-  React.useEffect(() => {
-    const interceptor = axios.interceptors.request.use(config => {
-      if (tokenRef.current) {
-        config.headers.Authorization = `Bearer ${tokenRef.current}`;
-      }
-      return config;
-    });
-    return () => axios.interceptors.request.eject(interceptor);
-  }, []);
+  React.useEffect(() => { setPaginaLivros(1); }, [filtroGenero, filtroDisp]);
+  React.useEffect(() => { setPaginaHome(1); setPaginaHomeProfessor(1); }, [livros]);
 
   const livrosFiltrados = livros.filter(livro => {
     const textoOk = livro.titulo?.toLowerCase().includes(buscaTexto.toLowerCase()) ||
@@ -407,31 +358,42 @@ export default function App() {
     return textoOk && generoOk && dispOk;
   });
 
+  const LIVROS_POR_PAGINA = 20;
+  const totalPaginasLivros = Math.max(1, Math.ceil(livrosFiltrados.length / LIVROS_POR_PAGINA));
+  const livrosPaginados = livrosFiltrados.slice(
+    (paginaLivros - 1) * LIVROS_POR_PAGINA,
+    paginaLivros * LIVROS_POR_PAGINA,
+  );
+  const totalPaginasHome = Math.max(1, Math.ceil(livros.length / LIVROS_POR_PAGINA));
+  const livrosPaginadosHome = livros.slice(
+    (paginaHome - 1) * LIVROS_POR_PAGINA,
+    paginaHome * LIVROS_POR_PAGINA,
+  );
+  const totalPaginasHomeProfessor = Math.max(1, Math.ceil(livros.length / LIVROS_POR_PAGINA));
+  const livrosPaginadosHomeProfessor = livros.slice(
+    (paginaHomeProfessor - 1) * LIVROS_POR_PAGINA,
+    paginaHomeProfessor * LIVROS_POR_PAGINA,
+  );
+
+  function handleBuscaChange(text: string) {
+    setBuscaInput(text);
+    if (buscaTimerRef.current) clearTimeout(buscaTimerRef.current);
+    buscaTimerRef.current = setTimeout(() => {
+      setBuscaTexto(text);
+      setPaginaLivros(1);
+    }, 500);
+  }
+
   const generosUnicos = ['todos', ...Array.from(new Set(livros.map(l => l.genero).filter(Boolean))) as string[]];
 
-  async function carregarDados(usuarioAtual = usuario, tokenAtual = tokenRef.current) {
+  async function carregarDados(usuarioAtual = usuario) {
     setCarregando(true);
     setErroConexao(false);
     try {
       const uid = usuarioAtual?.id;
-      const safe = <T,>(p: Promise<{ data: T }>, fallback: T): Promise<{ data: T }> =>
-        p.catch(() => ({ data: fallback }));
-      const headers = tokenAtual ? { Authorization: `Bearer ${tokenAtual}` } : {};
-      const [resLivros, resEmp, resAvaliacoes, resDesejos, resUsuarios, resComunicados, resSuspensoes] = await Promise.all([
-        safe(axios.get(`${API_URL}/livros`, { headers }), [] as Livro[]),
-        safe(axios.get(`${API_URL}/emprestimos`, { headers }), [] as Emprestimo[]),
-        safe(axios.get(`${API_URL}/avaliacoes`, { headers }), [] as Avaliacao[]),
-        uid
-          ? safe(axios.get(`${API_URL}/desejos?usuarioId=${uid}`, { headers }), [] as Desejo[])
-          : Promise.resolve({ data: [] as Desejo[] }),
-        (usuarioAtual?.perfil === 'bibliotecario' || usuarioAtual?.perfil === 'professor')
-          ? axios.get(`${API_URL}/usuarios`, { headers }).catch((e: unknown) => { console.error('[GET /usuarios]', (e as any)?.response?.status, (e as any)?.message); return { data: [] as Usuario[] }; })
-          : Promise.resolve({ data: [] as Usuario[] }),
-        safe(axios.get(`${API_URL}/comunicados`, { headers }), []),
-        safe(axios.get(`${API_URL}/suspensoes`, { headers }), []),
-      ]);
-      setLivros(Array.isArray(resLivros.data) ? resLivros.data as Livro[] : []);
-      const todosEmprestimos: Emprestimo[] = Array.isArray(resEmp.data) ? resEmp.data : [];
+      const dados = await carregarDadosBiblioteca(usuarioAtual);
+      setLivros(Array.isArray(dados.livros) ? dados.livros : []);
+      const todosEmprestimos: Emprestimo[] = Array.isArray(dados.emprestimos) ? dados.emprestimos : [];
       const isBiblio = usuarioAtual?.perfil === 'bibliotecario';
       const ativos = todosEmprestimos.filter(e => e.status === 'reservado' || e.status === 'retirado');
       const devolvidos = todosEmprestimos.filter(e => e.status === 'devolvido');
@@ -439,11 +401,11 @@ export default function App() {
       setEmprestimosAtivos(isBiblio ? ativos : ativos.filter(e => e.usuarioId === uid));
       setHistorico(isBiblio ? devolvidos : devolvidos.filter(e => e.usuarioId === uid));
       if (isBiblio || isProf) setEmprestimosEscola(todosEmprestimos);
-      setTodasAvaliacoes(Array.isArray(resAvaliacoes.data) ? resAvaliacoes.data as Avaliacao[] : []);
-      setDesejos(Array.isArray(resDesejos.data) ? (resDesejos.data as unknown) as Desejo[] : []);
-      setUsuariosAdmin(Array.isArray(resUsuarios.data) ? resUsuarios.data as Usuario[] : []);
-      setComunicados(Array.isArray((resComunicados as any).data) ? (resComunicados as any).data : []);
-      setSuspensoes(Array.isArray((resSuspensoes as any).data) ? (resSuspensoes as any).data : []);
+      setTodasAvaliacoes(Array.isArray(dados.avaliacoes) ? dados.avaliacoes : []);
+      setDesejos(Array.isArray(dados.desejos) ? dados.desejos : []);
+      setUsuariosAdmin(Array.isArray(dados.usuarios) ? dados.usuarios : []);
+      setComunicados(Array.isArray(dados.comunicados) ? dados.comunicados : []);
+      setSuspensoes(Array.isArray(dados.suspensoes) ? dados.suspensoes : []);
     } catch {
       setErroConexao(true);
     } finally {
@@ -460,12 +422,12 @@ export default function App() {
     }
     setLoading(true);
     try {
-      const { data } = await axios.post(`${API_URL}/usuarios/login`, { email: email.trim(), senha: senha.trim() });
+      const data = await login(email.trim(), senha.trim());
       const iniciais = data.nome.split(' ').map((p: string) => p[0].toUpperCase()).join('').slice(0, 2);
       const usuarioLogado = { ...data, iniciais };
       setUsuario(usuarioLogado);
       setToken(data.token);
-      tokenRef.current = data.token; // ← atualiza a ref imediatamente
+      setApiAuthToken(data.token);
       if (data.perfil === 'aluno') {
         setTela('main'); setAbaAtiva('home');
       } else if (data.perfil === 'professor') {
@@ -473,7 +435,7 @@ export default function App() {
       } else {
         setTela('bibliotecario'); setAbaBiblio('dashboard');
       }
-      await carregarDados(usuarioLogado, data.token); // ← passa token diretamente
+      await carregarDados(usuarioLogado);
     } catch (err: unknown) {
       setErro(getApiErrorMessage(err, 'E-mail ou senha incorretos'));
     } finally {
@@ -492,7 +454,7 @@ export default function App() {
       Alert.alert('Senha fraca', 'Mínimo 6 caracteres.'); return;
     }
     try {
-      const { data } = await axios.post(`${API_URL}/usuarios`, {
+      const data = await cadastrarUsuario({
         nome: cadNome.trim(), email: cadEmail.trim(), senha: cadSenha.trim(),
         matricula: cadMatricula.trim(), turma: cadTurma.trim(), perfil: 'aluno',
       });
@@ -522,7 +484,7 @@ export default function App() {
       Alert.alert('Senha fraca', 'Mínimo 6 caracteres.'); return;
     }
     try {
-      const { data } = await axios.post(`${API_URL}/usuarios`, {
+      const data = await cadastrarUsuario({
         nome: profNome.trim(), email: profEmail.trim(), senha: profSenha.trim(),
         matricula: profDisciplina, perfil: 'professor',
       });
@@ -544,7 +506,7 @@ export default function App() {
   async function handleReserva(livro: Livro) {
     if (!usuario) return;
     try {
-      const { data } = await axios.get(`${API_URL}/suspensoes/verificar/${usuario.id}`);
+      const data = await verificarSuspensao(usuario.id);
       if (data.bloqueado) {
         const expira = new Date(data.expiraEm).toLocaleDateString('pt-BR');
         Alert.alert(
@@ -560,7 +522,7 @@ export default function App() {
       Alert.alert('Indisponível', 'Sem exemplares disponíveis.'); return;
     }
     try {
-      await axios.post(`${API_URL}/emprestimos`, { livroId: livro.id });
+      await reservarLivro(livro.id);
       Alert.alert('Reserva confirmada!', `"${livro.titulo}" reservado!`);
       await carregarDados();
       setLivroSelecionado(null);
@@ -581,7 +543,7 @@ export default function App() {
   async function handleGerarQrRetirada(emp: Emprestimo) {
     setGerandoQrRetirada(true);
     try {
-      const { data } = await axios.post(`${API_URL}/emprestimos/${emp.id}/qr-retirada`, {});
+      const data = await gerarQrRetirada(emp.id);
       setEmprestimoQrAtual(emp);
       setDadosQrRetirada(data);
       setTelaQrRetirada(true);
@@ -592,7 +554,7 @@ export default function App() {
 
       intervaloQrRef.current = setInterval(async () => {
         try {
-          const { data: empAtualizado } = await axios.get(`${API_URL}/emprestimos`);
+          const empAtualizado = await listarEmprestimos();
           const empEncontrado = empAtualizado.find((e: Emprestimo) => e.id === emp.id);
           if (empEncontrado?.status === 'retirado') {
             cancelarPollingQr();
@@ -627,7 +589,7 @@ export default function App() {
     if (!codigo) return null;
     setValidandoQrRetirada(true);
     try {
-      const { data } = await axios.patch(`${API_URL}/emprestimos/retirada-qr`, { codigo });
+      const data = await validarQrRetirada(codigo);
       setCodigoQrRetirada('');
       if (exibirAlertas) {
         Alert.alert('Retirada confirmada!', 'Empréstimo atualizado como retirado.');
@@ -693,7 +655,7 @@ export default function App() {
 
   async function handleAplicarSuspensao(emp: Emprestimo, dias: number, motivo: string) {
     try {
-      await axios.post(`${API_URL}/suspensoes`, {
+      await aplicarSuspensao({
         usuarioId: emp.usuarioId,
         emprestimoId: emp.id,
         dias,
@@ -708,7 +670,7 @@ export default function App() {
 
   async function handleDevolucao(emp: Emprestimo) {
     try {
-      await axios.patch(`${API_URL}/emprestimos/${emp.id}/devolver`);
+      await devolverEmprestimo(emp.id);
       Alert.alert('Devolução registrada!', 'Livro devolvido com sucesso.');
       await carregarDados();
     } catch {
@@ -718,7 +680,7 @@ export default function App() {
 
   async function handleMarcarRetirada(emp: Emprestimo) {
     try {
-      await axios.patch(`${API_URL}/emprestimos/${emp.id}/retirar`);
+      await retirarEmprestimo(emp.id);
       Alert.alert('Retirada confirmada!', 'O empréstimo foi marcado como retirado.');
       await carregarDados();
     } catch (err: unknown) {
@@ -733,7 +695,7 @@ export default function App() {
     }
     setSalvandoLivro(true);
     try {
-      await axios.post(`${API_URL}/livros`, {
+      await criarLivro({
         titulo: livroTituloNovo.trim(),
         autor: livroAutorNovo.trim(),
         genero: livroGeneroNovo.trim(),
@@ -767,9 +729,15 @@ export default function App() {
     }
     const novoDisponivel = Math.max(0, novoTotal - emprestados);
     try {
-      await axios.patch(`${API_URL}/livros/${livro.id}`, {
+      await atualizarLivro(livro.id, {
+        titulo: livro.titulo,
+        autor: livro.autor,
+        genero: livro.genero,
+        sinopse: livro.sinopse,
+        capa: livro.capa,
         totalExemplares: novoTotal,
         disponiveis: novoDisponivel,
+        prateleira: livro.prateleira,
       });
       await carregarDados();
     } catch (err: unknown) {
@@ -788,7 +756,7 @@ export default function App() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await axios.delete(`${API_URL}/livros/${livro.id}`);
+              await removerLivro(livro.id);
               await carregarDados();
             } catch (err: unknown) {
               Alert.alert('Erro', getApiErrorMessage(err, 'Não foi possível remover livro.'));
@@ -809,7 +777,7 @@ export default function App() {
           text: 'Renovar',
           onPress: async () => {
             try {
-              await axios.patch(`${API_URL}/emprestimos/${emp.id}/renovar`);
+              await renovarEmprestimo(emp.id);
               Alert.alert('Renovado!', 'Prazo estendido por mais 5 dias.');
               await carregarDados();
             } catch (err: unknown) {
@@ -827,7 +795,7 @@ export default function App() {
     }
     setEnviandoResenha(true);
     try {
-      await axios.post(`${API_URL}/avaliacoes`, {
+      await enviarAvaliacao({
         livroId: livroParaResenhar?.livroId,
         nota: notaResenha,
         resenha: textoResenha,
@@ -853,12 +821,10 @@ export default function App() {
     setTogglendoDesejo(livro.id);
     try {
       if (existente) {
-        await axios.delete(`${API_URL}/desejos/${existente.id}`);
+        await removerDesejo(existente.id);
         setDesejos(prev => prev.filter(d => d.id !== existente.id));
       } else {
-        const { data } = await axios.post(`${API_URL}/desejos`, {
-          livroId: livro.id,
-        });
+        const data = await adicionarDesejo(livro.id, usuario?.id);
         setDesejos(prev => [...prev, data]);
       }
     } catch (err: unknown) {
@@ -890,7 +856,7 @@ export default function App() {
     setRecLoading(true);
     setRecMensagem('');
     try {
-      const { data } = await axios.post(`${API_URL}/usuarios/recuperar-senha`, { email: emailNormalizado });
+      const data = await solicitarRecuperacao(emailNormalizado);
       setRecEtapa('codigo');
       setRecMensagem(data?.mensagem || 'Código enviado. Confira seu e-mail institucional.');
       if (data?.codigo) {
@@ -920,7 +886,7 @@ export default function App() {
     setRecLoading(true);
     setRecMensagem('');
     try {
-      await axios.post(`${API_URL}/usuarios/redefinir-senha`, {
+      await redefinirSenha({
         email: emailNormalizado,
         codigo: recCodigo.trim(),
         novaSenha: recNovaSenha,
@@ -964,14 +930,13 @@ export default function App() {
     setLivroScaneado(null);
 
     try {
-      const { data } = await axios.post(`${API_URL}/api/scan-livro/analisar`, {
+      const data = await analisarCapa({
         imagemBase64: result.assets[0].base64,
         mediaType: result.assets[0].mimeType || 'image/jpeg',
       });
       setLivroScaneado({ ...data, totalExemplares: data.totalExemplares || 1 });
-    } catch (err: any) {
-      const msg = err?.response?.data?.erro || 'Não foi possível identificar o livro.';
-      Alert.alert('Erro ao escanear', msg);
+    } catch (err: unknown) {
+      Alert.alert('Erro ao escanear', getApiErrorMessage(err, 'Não foi possível identificar o livro.'));
     } finally {
       setScanandoCapa(false);
     }
@@ -981,14 +946,12 @@ export default function App() {
     if (!livroScaneado) return;
     setSalvandoScan(true);
     try {
-      await axios.post(`${API_URL}/livros`, livroScaneado, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await criarLivro(livroScaneado);
       Alert.alert('✅ Livro cadastrado!', `"${livroScaneado.titulo}" foi adicionado ao acervo.`);
       setLivroScaneado(null);
       await carregarDados();
-    } catch (err: any) {
-      Alert.alert('Erro', err?.response?.data?.erro || 'Não foi possível cadastrar.');
+    } catch (err: unknown) {
+      Alert.alert('Erro', getApiErrorMessage(err, 'Não foi possível cadastrar.'));
     } finally {
       setSalvandoScan(false);
     }
@@ -1008,9 +971,10 @@ export default function App() {
               { text: 'Cancelar', style: 'cancel' },
               { text: 'Sim, excluir minha conta', style: 'destructive', onPress: async () => {
                 try {
-                  await axios.delete(`${API_URL}/usuarios/me`, { headers: { Authorization: `Bearer ${tokenRef.current}` } });
+                  await excluirConta();
                 } catch (_) {}
                 setToken('');
+                setApiAuthToken(null);
                 setTelaHistorico(false);
                 setTelaComunicadosPerfil(false);
                 setTela('login'); setEmail(''); setSenha(''); setErro('');
@@ -1028,7 +992,8 @@ export default function App() {
     Alert.alert('Sair', 'Deseja sair da conta?', [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Sair', style: 'destructive', onPress: () => {
-        setToken(''); // ← limpa o token
+        setToken('');
+        setApiAuthToken(null);
         setTelaHistorico(false);
         setTelaComunicadosPerfil(false);
         setTela('login'); setEmail(''); setSenha(''); setErro('');
@@ -1281,55 +1246,13 @@ export default function App() {
   // ── RENDERS COMPARTILHADOS (usados por aluno, professor e bibliotecário) ──
 
   const renderNotificacoes = () => (
-    <ScrollView style={{ flex: 1 }}>
-      <View style={s.homeHeader}>
-        <View>
-          <Text style={s.homeGreeting}>Avisos e comunicados</Text>
-          <Text style={s.homeName}>{comunicados.length} mensagens</Text>
-        </View>
-      </View>
-      <View style={{ padding: 16 }}>
-        {carregando ? (
-          <ActivityIndicator color={CORES.amber} size="large" style={{ marginTop: 40 }} />
-        ) : comunicados.length === 0 ? (
-          <View style={s.emptyBox}>
-            <Text style={{ fontSize: 40, textAlign: 'center', marginBottom: 12 }}>📢</Text>
-            <Text style={s.emptyText}>Nenhum comunicado no momento</Text>
-          </View>
-        ) : comunicados.map((com: any) => (
-          <View key={com.id} style={s.comunicadoCard}>
-            <View style={s.comunicadoHeader}>
-              <View style={s.comunicadoIconWrap}>
-                <Text style={{ fontSize: 20 }}>
-                  {com.destinatario === 'alunos' ? '🎒' :
-                   com.destinatario === 'professores' ? '📖' : '📢'}
-                </Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={s.comunicadoTitulo}>{com.titulo}</Text>
-                <Text style={s.comunicadoMeta}>
-                  {com.criadoEm ? new Date(com.criadoEm).toLocaleDateString('pt-BR') : '—'}
-                </Text>
-              </View>
-              <View style={[s.badgeSmall, {
-                backgroundColor: com.destinatario === 'todos' ? 'rgba(74,124,89,0.12)' :
-                  com.destinatario === 'alunos' ? 'rgba(201,123,46,0.12)' : 'rgba(74,100,144,0.12)'
-              }]}>
-                <Text style={[s.badgeText, {
-                  color: com.destinatario === 'todos' ? CORES.sage :
-                    com.destinatario === 'alunos' ? CORES.amber : '#4a6490'
-                }]}>
-                  {com.destinatario === 'todos' ? 'Todos' :
-                   com.destinatario === 'alunos' ? 'Alunos' : 'Professores'}
-                </Text>
-              </View>
-            </View>
-            <Text style={s.comunicadoMensagem}>{com.mensagem}</Text>
-            <Text style={s.comunicadoAutor}>Enviado por: {com.autor}</Text>
-          </View>
-        ))}
-      </View>
-    </ScrollView>
+    <ComunicadosList
+      comunicados={comunicados}
+      carregando={carregando}
+      titulo="Avisos e comunicados"
+      subtitulo={`${comunicados.length} mensagens`}
+      showAudienceBadge
+    />
   );
 
   // ── RENDERS DO ALUNO ──
@@ -1428,7 +1351,7 @@ export default function App() {
                   onPress={async () => {
                     if (!usuario) return;
                     try {
-                      await axios.post(`${API_URL}/desejos`, { livroId: livroSelecionado?.id });
+                      await adicionarDesejo(String(livroSelecionado?.id), usuario.id);
                       Alert.alert('Fila de espera', 'Você foi adicionado à lista de desejos! Será avisado quando disponível.');
                       await carregarDados();
                     } catch {
@@ -1622,21 +1545,44 @@ export default function App() {
               <View style={s.emptyBox}>
                 <Text style={s.emptyText}>Nenhum livro no acervo ainda</Text>
               </View>
-            ) : livros.map(livro => (
-              <TouchableOpacity key={livro.id} style={s.loanCard} onPress={() => setLivroSelecionado(livro)}>
-                <View style={[s.loanCover, { backgroundColor: CORES.ink }]} />
-                <View style={s.loanInfo}>
-                  <Text style={s.loanTitle}>{livro.titulo}</Text>
-                  <Text style={s.loanAuthor}>{livro.autor}</Text>
-                  <View style={[s.badgeSmall, { backgroundColor: livro.disponiveis > 0 ? 'rgba(74,124,89,0.12)' : 'rgba(184,76,46,0.12)' }]}>
-                    <Text style={[s.badgeText, { color: livro.disponiveis > 0 ? CORES.sage : CORES.rust }]}>
-                      {livro.disponiveis > 0 ? `✓ ${livro.disponiveis} disponível(is)` : '✗ Indisponível'}
+            ) : (
+              <>
+                {livrosPaginadosHome.map(livro => (
+                  <TouchableOpacity key={livro.id} style={s.loanCard} onPress={() => setLivroSelecionado(livro)}>
+                    <View style={[s.loanCover, { backgroundColor: CORES.ink }]} />
+                    <View style={s.loanInfo}>
+                      <Text style={s.loanTitle}>{livro.titulo}</Text>
+                      <Text style={s.loanAuthor}>{livro.autor}</Text>
+                      <View style={[s.badgeSmall, { backgroundColor: livro.disponiveis > 0 ? 'rgba(74,124,89,0.12)' : 'rgba(184,76,46,0.12)' }]}>
+                        <Text style={[s.badgeText, { color: livro.disponiveis > 0 ? CORES.sage : CORES.rust }]}>
+                          {livro.disponiveis > 0 ? `✓ ${livro.disponiveis} disponível(is)` : '✗ Indisponível'}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={{ color: CORES.muted, fontSize: 20 }}>›</Text>
+                  </TouchableOpacity>
+                ))}
+                {totalPaginasHome > 1 && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, gap: 8 }}>
+                    <TouchableOpacity
+                      style={[s.btnSecundario, { flex: 1, opacity: paginaHome <= 1 ? 0.4 : 1 }]}
+                      disabled={paginaHome <= 1}
+                      onPress={() => setPaginaHome(p => p - 1)}>
+                      <Text style={s.btnSecundarioText}>← Anterior</Text>
+                    </TouchableOpacity>
+                    <Text style={{ color: CORES.muted, fontSize: 13, minWidth: 60, textAlign: 'center' }}>
+                      {paginaHome}/{totalPaginasHome}
                     </Text>
+                    <TouchableOpacity
+                      style={[s.btnSecundario, { flex: 1, opacity: paginaHome >= totalPaginasHome ? 0.4 : 1 }]}
+                      disabled={paginaHome >= totalPaginasHome}
+                      onPress={() => setPaginaHome(p => p + 1)}>
+                      <Text style={s.btnSecundarioText}>Próxima →</Text>
+                    </TouchableOpacity>
                   </View>
-                </View>
-                <Text style={{ color: CORES.muted, fontSize: 20 }}>›</Text>
-              </TouchableOpacity>
-            ))}
+                )}
+              </>
+            )}
           </>
         )}
       </View>
@@ -1659,7 +1605,7 @@ export default function App() {
           <TextInput style={[s.input, { marginBottom: 12 }]}
             placeholder="🔍  Buscar por título ou autor..."
             placeholderTextColor={CORES.muted}
-            value={buscaTexto} onChangeText={setBuscaTexto} />
+            value={buscaInput} onChangeText={handleBuscaChange} />
           <Text style={s.sectionLabel}>DISPONIBILIDADE</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
             <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -1696,32 +1642,55 @@ export default function App() {
             <View style={s.emptyBox}>
               <Text style={s.emptyText}>Nenhum livro encontrado{'\n'}Tente outros filtros</Text>
             </View>
-          ) : livrosFiltrados.map(livro => (
-            <TouchableOpacity key={livro.id} style={s.loanCard} onPress={() => setLivroSelecionado(livro)}>
-              <View style={[s.loanCover, { backgroundColor: CORES.ink }]} />
-              <View style={s.loanInfo}>
-                <Text style={s.loanTitle}>{livro.titulo}</Text>
-                <Text style={s.loanAuthor}>{livro.autor}</Text>
-                {livro.genero ? <Text style={[s.loanAuthor, { color: CORES.amber }]}>{livro.genero}</Text> : null}
-                <View style={[s.badgeSmall, { backgroundColor: livro.disponiveis > 0 ? 'rgba(74,124,89,0.12)' : 'rgba(184,76,46,0.12)' }]}>
-                  <Text style={[s.badgeText, { color: livro.disponiveis > 0 ? CORES.sage : CORES.rust }]}>
-                    {livro.disponiveis > 0 ? `✓ ${livro.disponiveis} disponível(is)` : '✗ Indisponível'}
-                  </Text>
-                </View>
-              </View>
-              <View style={{ alignItems: 'center', gap: 2 }}>
-                <TouchableOpacity
-                  onPress={() => handleToggleDesejo(livro)}
-                  disabled={togglendoDesejo === livro.id}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Text style={{ fontSize: 20, opacity: togglendoDesejo === livro.id ? 0.4 : 1 }}>
-                    {desejos.find(d => d.livroId === livro.id) ? '❤️' : '🤍'}
-                  </Text>
+          ) : (
+            <>
+              {livrosPaginados.map(livro => (
+                <TouchableOpacity key={livro.id} style={s.loanCard} onPress={() => setLivroSelecionado(livro)}>
+                  <View style={[s.loanCover, { backgroundColor: CORES.ink }]} />
+                  <View style={s.loanInfo}>
+                    <Text style={s.loanTitle}>{livro.titulo}</Text>
+                    <Text style={s.loanAuthor}>{livro.autor}</Text>
+                    {livro.genero ? <Text style={[s.loanAuthor, { color: CORES.amber }]}>{livro.genero}</Text> : null}
+                    <View style={[s.badgeSmall, { backgroundColor: livro.disponiveis > 0 ? 'rgba(74,124,89,0.12)' : 'rgba(184,76,46,0.12)' }]}>
+                      <Text style={[s.badgeText, { color: livro.disponiveis > 0 ? CORES.sage : CORES.rust }]}>
+                        {livro.disponiveis > 0 ? `✓ ${livro.disponiveis} disponível(is)` : '✗ Indisponível'}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={{ alignItems: 'center', gap: 2 }}>
+                    <TouchableOpacity
+                      onPress={() => handleToggleDesejo(livro)}
+                      disabled={togglendoDesejo === livro.id}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <Text style={{ fontSize: 20, opacity: togglendoDesejo === livro.id ? 0.4 : 1 }}>
+                        {desejos.find(d => d.livroId === livro.id) ? '❤️' : '🤍'}
+                      </Text>
+                    </TouchableOpacity>
+                    <Text style={{ color: CORES.muted, fontSize: 20 }}>›</Text>
+                  </View>
                 </TouchableOpacity>
-                <Text style={{ color: CORES.muted, fontSize: 20 }}>›</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+              ))}
+              {totalPaginasLivros > 1 && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, gap: 8 }}>
+                  <TouchableOpacity
+                    style={[s.btnSecundario, { flex: 1, opacity: paginaLivros <= 1 ? 0.4 : 1 }]}
+                    disabled={paginaLivros <= 1}
+                    onPress={() => setPaginaLivros(p => p - 1)}>
+                    <Text style={s.btnSecundarioText}>← Anterior</Text>
+                  </TouchableOpacity>
+                  <Text style={{ color: CORES.muted, fontSize: 13, minWidth: 60, textAlign: 'center' }}>
+                    {paginaLivros}/{totalPaginasLivros}
+                  </Text>
+                  <TouchableOpacity
+                    style={[s.btnSecundario, { flex: 1, opacity: paginaLivros >= totalPaginasLivros ? 0.4 : 1 }]}
+                    disabled={paginaLivros >= totalPaginasLivros}
+                    onPress={() => setPaginaLivros(p => p + 1)}>
+                    <Text style={s.btnSecundarioText}>Próxima →</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </>
+          )}
         </View>
       </ScrollView>
     );
@@ -2121,44 +2090,16 @@ export default function App() {
     // Tela de comunicados/notificações
     if (telaComunicadosPerfil) {
       return (
-        <ScrollView style={{ flex: 1 }}>
-          <View style={s.homeHeader}>
+        <ComunicadosList
+          comunicados={comunicados}
+          titulo="Notificações"
+          subtitulo={`${comunicados.length} comunicado(s)`}
+          headerLeft={(
             <TouchableOpacity onPress={() => setTelaComunicadosPerfil(false)} style={{ marginRight: 12 }}>
               <Text style={{ color: CORES.amberLt, fontSize: 16, fontWeight: '700' }}>← Voltar</Text>
             </TouchableOpacity>
-            <View style={{ flex: 1 }}>
-              <Text style={s.homeGreeting}>Notificações</Text>
-              <Text style={s.homeName}>{comunicados.length} comunicado(s)</Text>
-            </View>
-          </View>
-          <View style={{ padding: 16 }}>
-            {comunicados.length === 0 ? (
-              <View style={s.emptyBox}>
-                <Text style={{ fontSize: 40, textAlign: 'center', marginBottom: 12 }}>📢</Text>
-                <Text style={s.emptyText}>Nenhum comunicado no momento</Text>
-              </View>
-            ) : comunicados.map((com: any) => (
-              <View key={com.id} style={s.comunicadoCard}>
-                <View style={s.comunicadoHeader}>
-                  <View style={s.comunicadoIconWrap}>
-                    <Text style={{ fontSize: 20 }}>
-                      {com.destinatario === 'alunos' ? '🎒' :
-                       com.destinatario === 'professores' ? '📖' : '📢'}
-                    </Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.comunicadoTitulo}>{com.titulo}</Text>
-                    <Text style={s.comunicadoMeta}>
-                      {com.criadoEm ? new Date(com.criadoEm).toLocaleDateString('pt-BR') : '—'}
-                    </Text>
-                  </View>
-                </View>
-                <Text style={s.comunicadoMensagem}>{com.mensagem}</Text>
-                <Text style={s.comunicadoAutor}>Enviado por: {com.autor}</Text>
-              </View>
-            ))}
-          </View>
-        </ScrollView>
+          )}
+        />
       );
     }
 
@@ -2523,19 +2464,11 @@ export default function App() {
               onPress={async () => {
                 setReparando(true);
                 try {
-                  const { data } = await axios.post(
-                    `${API_URL}/emprestimos/reparar-orfaos`,
-                    {},
-                    { headers: { Authorization: `Bearer ${token}` } }
-                  );
+                  const data = await repararEmprestimos();
                   Alert.alert('Reparo concluído', data.mensagem);
                   await carregarDados();
                 } catch (err) {
-                  const status = axios.isAxiosError(err) ? err.response?.status : null;
-                  const msg = axios.isAxiosError(err)
-                    ? (err.response?.data?.erro || JSON.stringify(err.response?.data) || err.message)
-                    : String(err);
-                  Alert.alert('Erro', `[${status ?? 'sem resposta'}] ${msg}`);
+                  Alert.alert('Erro', getApiErrorMessage(err, 'Não foi possível executar o reparo.'));
                 } finally {
                   setReparando(false);
                 }
@@ -2797,26 +2730,50 @@ export default function App() {
               {livros.length === 0 ? (
                 <View style={s.emptyBox}>
                   <Text style={s.emptyText}>Nenhum livro no acervo ainda</Text>
+
                 </View>
-              ) : livros.slice(0, 5).map(livro => (
-                <TouchableOpacity key={livro.id} style={s.loanCard} onPress={() => setLivroSelecionado(livro)}>
-                  {livro.capa ? (
-                    <Image source={{ uri: livro.capa }} style={s.loanCover} resizeMode="cover" />
-                  ) : (
-                    <View style={[s.loanCover, { backgroundColor: CORES.ink }]} />
-                  )}
-                  <View style={s.loanInfo}>
-                    <Text style={s.loanTitle}>{livro.titulo}</Text>
-                    <Text style={s.loanAuthor}>{livro.autor}</Text>
-                    <View style={[s.badgeSmall, { backgroundColor: livro.disponiveis > 0 ? 'rgba(74,124,89,0.12)' : 'rgba(184,76,46,0.12)' }]}>
-                      <Text style={[s.badgeText, { color: livro.disponiveis > 0 ? CORES.sage : CORES.rust }]}>
-                        {livro.disponiveis > 0 ? `✓ ${livro.disponiveis} disponível(is)` : '✗ Indisponível'}
+              ) : (
+                <>
+                  {livrosPaginadosHomeProfessor.map(livro => (
+                    <TouchableOpacity key={livro.id} style={s.loanCard} onPress={() => setLivroSelecionado(livro)}>
+                      {livro.capa ? (
+                        <Image source={{ uri: livro.capa }} style={s.loanCover} resizeMode="cover" />
+                      ) : (
+                        <View style={[s.loanCover, { backgroundColor: CORES.ink }]} />
+                      )}
+                      <View style={s.loanInfo}>
+                        <Text style={s.loanTitle}>{livro.titulo}</Text>
+                        <Text style={s.loanAuthor}>{livro.autor}</Text>
+                        <View style={[s.badgeSmall, { backgroundColor: livro.disponiveis > 0 ? 'rgba(74,124,89,0.12)' : 'rgba(184,76,46,0.12)' }]}>
+                          <Text style={[s.badgeText, { color: livro.disponiveis > 0 ? CORES.sage : CORES.rust }]}>
+                            {livro.disponiveis > 0 ? `✓ ${livro.disponiveis} disponível(is)` : '✗ Indisponível'}
+                          </Text>
+                        </View>
+                      </View>
+                      <Text style={{ color: CORES.muted, fontSize: 20 }}>›</Text>
+                    </TouchableOpacity>
+                  ))}
+                  {totalPaginasHomeProfessor > 1 && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, gap: 8 }}>
+                      <TouchableOpacity
+                        style={[s.btnSecundario, { flex: 1, opacity: paginaHomeProfessor <= 1 ? 0.4 : 1 }]}
+                        disabled={paginaHomeProfessor <= 1}
+                        onPress={() => setPaginaHomeProfessor(p => p - 1)}>
+                        <Text style={s.btnSecundarioText}>← Anterior</Text>
+                      </TouchableOpacity>
+                      <Text style={{ color: CORES.muted, fontSize: 13, minWidth: 60, textAlign: 'center' }}>
+                        {paginaHomeProfessor}/{totalPaginasHomeProfessor}
                       </Text>
+                      <TouchableOpacity
+                        style={[s.btnSecundario, { flex: 1, opacity: paginaHomeProfessor >= totalPaginasHomeProfessor ? 0.4 : 1 }]}
+                        disabled={paginaHomeProfessor >= totalPaginasHomeProfessor}
+                        onPress={() => setPaginaHomeProfessor(p => p + 1)}>
+                        <Text style={s.btnSecundarioText}>Próxima →</Text>
+                      </TouchableOpacity>
                     </View>
-                  </View>
-                  <Text style={{ color: CORES.muted, fontSize: 20 }}>›</Text>
-                </TouchableOpacity>
-              ))}
+                  )}
+                </>
+              )}
             </>
           )}
         </View>
