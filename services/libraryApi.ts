@@ -43,6 +43,8 @@ type LivroPayload = {
   prateleira?: string;
 };
 
+let dashboardEndpointAvailable = true;
+
 export function getApiErrorMessage(err: unknown, fallback: string): string {
   if (axios.isAxiosError<ApiErro>(err)) {
     return err.response?.data?.erro || fallback;
@@ -80,19 +82,25 @@ export async function carregarDadosBiblioteca(usuarioAtual?: Usuario | null): Pr
   const uid = usuarioAtual?.id;
   const query = uid ? `?usuarioId=${uid}` : '';
 
-  try {
-    const { data } = await http.get<DashboardData>(`/dashboard${query}`);
-    return {
-      livros: Array.isArray(data.livros) ? data.livros : [],
-      emprestimos: Array.isArray(data.emprestimos) ? data.emprestimos : [],
-      avaliacoes: Array.isArray(data.avaliacoes) ? data.avaliacoes : [],
-      desejos: Array.isArray(data.desejos) ? data.desejos : [],
-      usuarios: Array.isArray(data.usuarios) ? data.usuarios : [],
-      comunicados: Array.isArray(data.comunicados) ? data.comunicados.map(normalizarComunicado) : [],
-      suspensoes: Array.isArray(data.suspensoes) ? data.suspensoes : [],
-    };
-  } catch (e: unknown) {
-    logAxiosError('[GET /dashboard]', e);
+  if (dashboardEndpointAvailable) {
+    try {
+      const { data } = await http.get<DashboardData>(`/dashboard${query}`);
+      return {
+        livros: Array.isArray(data.livros) ? data.livros : [],
+        emprestimos: Array.isArray(data.emprestimos) ? data.emprestimos : [],
+        avaliacoes: Array.isArray(data.avaliacoes) ? data.avaliacoes : [],
+        desejos: Array.isArray(data.desejos) ? data.desejos : [],
+        usuarios: Array.isArray(data.usuarios) ? data.usuarios : [],
+        comunicados: Array.isArray(data.comunicados) ? data.comunicados.map(normalizarComunicado) : [],
+        suspensoes: Array.isArray(data.suspensoes) ? data.suspensoes : [],
+      };
+    } catch (e: unknown) {
+      if (axios.isAxiosError(e) && e.response?.status === 404) {
+        dashboardEndpointAvailable = false;
+      } else {
+        logAxiosError('[GET /dashboard]', e);
+      }
+    }
   }
 
   const uidFallback = usuarioAtual?.id;
