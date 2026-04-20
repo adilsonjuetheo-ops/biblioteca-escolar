@@ -95,6 +95,30 @@ async function readDb() {
   return normalizeData(JSON.parse(raw));
 }
 
+async function readDbSlices(keys) {
+  if (!Array.isArray(keys) || keys.length === 0) {
+    return {};
+  }
+
+  if (pool) {
+    if (!pgReady) pgReady = ensureTable().catch((err) => { console.error('[DB]', err.message); pgReady = null; });
+    await pgReady;
+
+    const pairs = keys.map((key, index) =>
+      `'${String(key).replace(/'/g, "''")}', COALESCE(data -> $${index + 1}, 'null'::jsonb)`
+    );
+    const query = `SELECT jsonb_build_object(${pairs.join(', ')}) AS data FROM app_data WHERE id = 1`;
+    const result = await pool.query(query, keys);
+    return result.rows[0]?.data || {};
+  }
+
+  const db = await readDb();
+  return keys.reduce((acc, key) => {
+    acc[key] = db[key];
+    return acc;
+  }, {});
+}
+
 async function writeDb(data) {
   if (pool) {
     await pgReady;
@@ -109,4 +133,4 @@ async function writeDb(data) {
   await fs.writeFile(dbPath, JSON.stringify(data, null, 2), 'utf-8');
 }
 
-module.exports = { readDb, writeDb };
+module.exports = { readDb, readDbSlices, writeDb };

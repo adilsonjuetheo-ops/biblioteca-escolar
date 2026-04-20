@@ -818,6 +818,7 @@ export default function App() {
 
   async function handleToggleDesejo(livro: { id: string }) {
     const existente = desejos.find(d => d.livroId === livro.id);
+    const livroAtual = livros.find(l => l.id === livro.id);
     setTogglendoDesejo(livro.id);
     try {
       if (existente) {
@@ -825,7 +826,13 @@ export default function App() {
         setDesejos(prev => prev.filter(d => d.id !== existente.id));
       } else {
         const data = await adicionarDesejo(livro.id, usuario?.id);
-        setDesejos(prev => [...prev, data]);
+        setDesejos(prev => [...prev, {
+          ...data,
+          livroTitulo: data.livroTitulo || livroAtual?.titulo,
+          livroAutor: data.livroAutor || livroAtual?.autor,
+          livroGenero: data.livroGenero || livroAtual?.genero,
+          livroCapa: data.livroCapa || livroAtual?.capa,
+        }]);
       }
     } catch (err: unknown) {
       Alert.alert('Erro', getApiErrorMessage(err, 'Não foi possível atualizar a lista de desejos.'));
@@ -1970,18 +1977,22 @@ export default function App() {
         ) : desejos.map(d => {
           const livroAtual = livros.find(l => l.id === d.livroId);
           const disp = livroAtual?.disponiveis ?? 0;
+          const tituloDesejo = d.livroTitulo || livroAtual?.titulo || `Livro #${d.livroId}`;
+          const autorDesejo = d.livroAutor || livroAtual?.autor || '—';
+          const generoDesejo = d.livroGenero || livroAtual?.genero || '';
+          const capaDesejo = d.livroCapa || livroAtual?.capa || '';
           return (
             <View key={d.id} style={s.loanCard}>
-              {d.livroCapa ? (
-                <Image source={{ uri: d.livroCapa }} style={s.loanCover} resizeMode="cover" />
+              {capaDesejo ? (
+                <Image source={{ uri: capaDesejo }} style={s.loanCover} resizeMode="cover" />
               ) : (
                 <View style={[s.loanCover, { backgroundColor: CORES.ink }]} />
               )}
               <View style={s.loanInfo}>
-                <Text style={s.loanTitle}>{d.livroTitulo}</Text>
-                <Text style={s.loanAuthor}>{d.livroAutor || '—'}</Text>
-                {d.livroGenero ? (
-                  <Text style={[s.loanAuthor, { color: CORES.amber }]}>{d.livroGenero}</Text>
+                <Text style={s.loanTitle}>{tituloDesejo}</Text>
+                <Text style={s.loanAuthor}>{autorDesejo}</Text>
+                {generoDesejo ? (
+                  <Text style={[s.loanAuthor, { color: CORES.amber }]}>{generoDesejo}</Text>
                 ) : null}
                 <View style={[s.badgeSmall, { backgroundColor: disp > 0 ? 'rgba(74,124,89,0.12)' : 'rgba(184,76,46,0.12)', marginTop: 6 }]}>
                   <Text style={[s.badgeText, { color: disp > 0 ? CORES.sage : CORES.rust }]}>

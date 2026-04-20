@@ -78,18 +78,36 @@ async function safeGet<T>(url: string, fallback: T): Promise<T> {
 
 export async function carregarDadosBiblioteca(usuarioAtual?: Usuario | null): Promise<DashboardData> {
   const uid = usuarioAtual?.id;
+  const query = uid ? `?usuarioId=${uid}` : '';
+
+  try {
+    const { data } = await http.get<DashboardData>(`/dashboard${query}`);
+    return {
+      livros: Array.isArray(data.livros) ? data.livros : [],
+      emprestimos: Array.isArray(data.emprestimos) ? data.emprestimos : [],
+      avaliacoes: Array.isArray(data.avaliacoes) ? data.avaliacoes : [],
+      desejos: Array.isArray(data.desejos) ? data.desejos : [],
+      usuarios: Array.isArray(data.usuarios) ? data.usuarios : [],
+      comunicados: Array.isArray(data.comunicados) ? data.comunicados.map(normalizarComunicado) : [],
+      suspensoes: Array.isArray(data.suspensoes) ? data.suspensoes : [],
+    };
+  } catch (e: unknown) {
+    logAxiosError('[GET /dashboard]', e);
+  }
+
+  const uidFallback = usuarioAtual?.id;
   const canViewUsers = usuarioAtual?.perfil === 'bibliotecario' || usuarioAtual?.perfil === 'professor';
 
   const [livros, emprestimos, avaliacoes, desejos, usuarios, comunicados, suspensoes] = await Promise.all([
     safeGet('/livros', [] as Livro[]),
     safeGet('/emprestimos', [] as Emprestimo[]),
     safeGet('/avaliacoes', [] as Avaliacao[]),
-    uid ? safeGet(`/desejos?usuarioId=${uid}`, [] as Desejo[]) : Promise.resolve([] as Desejo[]),
+    uidFallback ? safeGet(`/desejos?usuarioId=${uidFallback}`, [] as Desejo[]) : Promise.resolve([] as Desejo[]),
     canViewUsers
       ? http.get<Usuario[]>('/usuarios')
           .then((res) => res.data)
-          .catch((e: unknown) => {
-            logAxiosError('[GET /usuarios]', e);
+          .catch((err: unknown) => {
+            logAxiosError('[GET /usuarios]', err);
             return [] as Usuario[];
           })
       : Promise.resolve([] as Usuario[]),

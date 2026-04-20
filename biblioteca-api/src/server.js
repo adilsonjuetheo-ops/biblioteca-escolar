@@ -7,7 +7,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const Anthropic = require('@anthropic-ai/sdk');
 
-const { readDb, writeDb } = require('./db');
+const { readDb, readDbSlices, writeDb } = require('./db');
 const { sendRecoveryCode } = require('./mailer');
 
 const app = express();
@@ -213,6 +213,50 @@ app.use((_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
 
 app.get('/health', (_, res) => {
   res.json({ ok: true, service: 'biblioteca-api' });
+});
+
+app.get('/dashboard', verifyToken, async (req, res) => {
+  const { id, perfil } = req.usuario;
+  const canViewUsers = perfil === 'bibliotecario' || perfil === 'professor';
+  const canViewSuspensoes = perfil === 'bibliotecario' || perfil === 'professor';
+
+  const fatias = await readDbSlices([
+    'livros',
+    'emprestimos',
+    'avaliacoes',
+    'desejos',
+    'comunicados',
+    ...(canViewUsers ? ['usuarios'] : []),
+    ...(canViewSuspensoes ? ['suspensoes'] : []),
+  ]);
+
+  const livros = Array.isArray(fatias.livros) ? fatias.livros : [];
+  const emprestimosBase = Array.isArray(fatias.emprestimos) ? fatias.emprestimos : [];
+  const avaliacoes = Array.isArray(fatias.avaliacoes) ? fatias.avaliacoes : [];
+  const desejosBase = Array.isArray(fatias.desejos) ? fatias.desejos : [];
+  const comunicados = Array.isArray(fatias.comunicados) ? fatias.comunicados : [];
+  const usuariosBase = Array.isArray(fatias.usuarios) ? fatias.usuarios : [];
+  const suspensoes = Array.isArray(fatias.suspensoes) ? fatias.suspensoes : [];
+
+  const emprestimos = (perfil === 'bibliotecario' || perfil === 'professor')
+    ? emprestimosBase
+    : emprestimosBase.filter((e) => e.usuarioId === id);
+
+  const desejos = (perfil === 'bibliotecario' || perfil === 'professor')
+    ? desejosBase.filter((d) => !req.query.usuarioId || d.usuarioId === req.query.usuarioId)
+    : desejosBase.filter((d) => d.usuarioId === id);
+
+  const usuarios = canViewUsers ? usuariosBase.map(toPublicUser) : [];
+
+  res.json({
+    livros,
+    emprestimos,
+    avaliacoes,
+    desejos,
+    usuarios,
+    comunicados,
+    suspensoes,
+  });
 });
 
 // Cadastro — perfil restrito a 'aluno' e 'professor' (nunca 'bibliotecario')
