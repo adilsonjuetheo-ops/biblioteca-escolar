@@ -1312,7 +1312,7 @@ export default function App() {
             {[
               { label: 'Exemplares', valor: livroSelecionado?.totalExemplares || 1 },
               { label: 'Disponíveis', valor: livroSelecionado?.disponiveis || 0 },
-              { label: 'Prazo', valor: '14 dias' },
+              { label: 'Prazo', valor: '8 dias' },
             ].map((info, i) => (
               <View key={i} style={s.detalheInfoChip}>
                 <Text style={s.detalheInfoLabel}>{info.label}</Text>
