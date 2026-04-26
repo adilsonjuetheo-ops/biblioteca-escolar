@@ -225,8 +225,8 @@ app.get('/health', (_, res) => {
 
 app.get('/dashboard', verifyToken, async (req, res) => {
   const { id, perfil } = req.usuario;
-  const canViewUsers = perfil === 'bibliotecario' || perfil === 'professor';
-  const canViewSuspensoes = perfil === 'bibliotecario' || perfil === 'professor';
+  const canViewUsers = isAdmin(perfil) || perfil === 'professor';
+  const canViewSuspensoes = isAdmin(perfil) || perfil === 'professor';
 
   const fatias = await readDbSlices([
     'livros',
