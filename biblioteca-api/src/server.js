@@ -847,7 +847,7 @@ app.patch('/emprestimos/:id/renovar', verifyToken, async (req, res) => {
       return { status: 404, erro: 'Emprestimo nao encontrado.' };
     }
 
-    if (perfil !== 'bibliotecario' && emprestimo.usuarioId !== reqId) {
+    if (!isAdmin(perfil) && emprestimo.usuarioId !== reqId) {
       return { status: 403, erro: 'Voce nao pode renovar este emprestimo.' };
     }
 
