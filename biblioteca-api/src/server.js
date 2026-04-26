@@ -176,9 +176,17 @@ function verifyToken(req, res, next) {
   }
 }
 
+// Qualquer perfil que não seja aluno nem professor tem acesso administrativo
+function isAdmin(perfil) {
+  return perfil && perfil !== 'aluno' && perfil !== 'professor';
+}
+
 function requirePerfil(...perfis) {
   return (req, res, next) => {
-    if (!perfis.includes(req.usuario?.perfil)) {
+    const perfil = req.usuario?.perfil;
+    // Se a lista inclui 'bibliotecario', qualquer perfil admin também passa
+    const adminAllowed = perfis.includes('bibliotecario') && isAdmin(perfil);
+    if (!perfis.includes(perfil) && !adminAllowed) {
       res.status(403).json({ erro: 'Acesso nao autorizado para este perfil.' });
       return;
     }
