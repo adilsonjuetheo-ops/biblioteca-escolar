@@ -2767,7 +2767,6 @@ export default function App() {
                       ) : (
                         <View style={[s.loanCover, { backgroundColor: CORES.ink }]} />
                       )}
-
                       <View style={s.loanInfo}>
                         <Text style={s.loanTitle}>{livro.titulo}</Text>
                         <Text style={s.loanAuthor}>{livro.autor}</Text>
