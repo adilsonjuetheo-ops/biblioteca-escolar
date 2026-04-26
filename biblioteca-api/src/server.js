@@ -992,7 +992,7 @@ app.get('/desejos', verifyToken, async (req, res) => {
   const { id: reqId, perfil } = req.usuario;
   const db = await readDb();
   const lista = (db.desejos || []).filter((d) => {
-    if (perfil === 'bibliotecario' || perfil === 'professor') {
+    if (isAdmin(perfil) || perfil === 'professor') {
       return !req.query.usuarioId || d.usuarioId === req.query.usuarioId;
     }
     return d.usuarioId === reqId;
