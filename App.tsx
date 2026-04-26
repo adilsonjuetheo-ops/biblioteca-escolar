@@ -1555,7 +1555,11 @@ export default function App() {
               <>
                 {livrosPaginadosHome.map(livro => (
                   <TouchableOpacity key={livro.id} style={s.loanCard} onPress={() => setLivroSelecionado(livro)}>
-                    <View style={[s.loanCover, { backgroundColor: CORES.ink }]} />
+                    {livro.capa ? (
+                      <Image source={{ uri: livro.capa }} style={s.loanCover} resizeMode="cover" />
+                    ) : (
+                      <View style={[s.loanCover, { backgroundColor: CORES.ink }]} />
+                    )}
                     <View style={s.loanInfo}>
                       <Text style={s.loanTitle}>{livro.titulo}</Text>
                       <Text style={s.loanAuthor}>{livro.autor}</Text>
