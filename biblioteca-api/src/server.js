@@ -851,6 +851,10 @@ app.patch('/emprestimos/:id/renovar', verifyToken, async (req, res) => {
     }
 
     emprestimo.renovado = true;
+    const baseRenovacao = emprestimo.dataPrevistaDevolucao
+      ? new Date(emprestimo.dataPrevistaDevolucao).getTime()
+      : Date.now();
+    emprestimo.dataPrevistaDevolucao = new Date(baseRenovacao + 5 * 24 * 60 * 60 * 1000).toISOString();
     emprestimo.atualizadoEm = new Date().toISOString();
     await writeDb(db);
     return { status: 200, emprestimo };
