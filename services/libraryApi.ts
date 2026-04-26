@@ -104,7 +104,7 @@ export async function carregarDadosBiblioteca(usuarioAtual?: Usuario | null): Pr
   }
 
   const uidFallback = usuarioAtual?.id;
-  const canViewUsers = usuarioAtual?.perfil === 'bibliotecario' || usuarioAtual?.perfil === 'professor';
+  const canViewUsers = usuarioAtual?.perfil !== 'aluno' && usuarioAtual?.perfil !== undefined;
 
   const [livros, emprestimos, avaliacoes, desejos, usuarios, comunicados, suspensoes] = await Promise.all([
     safeGet('/livros', [] as Livro[]),
