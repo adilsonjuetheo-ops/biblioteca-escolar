@@ -1058,7 +1058,7 @@ app.delete('/desejos/:id', verifyToken, async (req, res) => {
     if (idx === -1) return { status: 404, erro: 'Item nao encontrado.' };
 
     const desejo = db.desejos[idx];
-    if (perfil !== 'bibliotecario' && desejo.usuarioId !== reqId) {
+    if (!isAdmin(perfil) && desejo.usuarioId !== reqId) {
       return { status: 403, erro: 'Voce nao pode remover este item.' };
     }
 
