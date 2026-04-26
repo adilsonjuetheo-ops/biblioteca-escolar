@@ -43,6 +43,8 @@ export type Emprestimo = {
   usuarioNome?: string;
   usuarioTurma?: string;
   dataReserva?: string;
+  dataRetirada?: string;
+  dataPrevistaDevolucao?: string;
   dataDevolucao?: string;
   renovado?: boolean;
 };
