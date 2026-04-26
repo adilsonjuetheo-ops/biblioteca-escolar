@@ -2325,24 +2325,47 @@ export default function App() {
               <View style={s.emptyBox}>
                 <Text style={s.emptyText}>Nenhum livro cadastrado{'\n'}Use o painel web para adicionar</Text>
               </View>
-            ) : livros.map(livro => (
-              <View key={livro.id} style={s.loanCard}>
-                {livro.capa ? (
-                  <Image source={{ uri: livro.capa }} style={s.loanCover} resizeMode="cover" />
-                ) : (
-                  <View style={[s.loanCover, { backgroundColor: CORES.ink }]} />
-                )}
-                <View style={s.loanInfo}>
-                  <Text style={s.loanTitle}>{livro.titulo}</Text>
-                  <Text style={s.loanAuthor}>{livro.autor}</Text>
-                  <View style={[s.badgeSmall, { backgroundColor: livro.disponiveis > 0 ? 'rgba(74,124,89,0.12)' : 'rgba(184,76,46,0.12)' }]}>
-                    <Text style={[s.badgeText, { color: livro.disponiveis > 0 ? CORES.sage : CORES.rust }]}>
-                      {livro.disponiveis > 0 ? `✓ ${livro.disponiveis} disponível(is)` : '✗ Indisponível'}
-                    </Text>
+            ) : (
+              <>
+                {livrosPaginadosGestao.map(livro => (
+                  <View key={livro.id} style={s.loanCard}>
+                    {livro.capa ? (
+                      <Image source={{ uri: livro.capa }} style={s.loanCover} resizeMode="cover" />
+                    ) : (
+                      <View style={[s.loanCover, { backgroundColor: CORES.ink }]} />
+                    )}
+                    <View style={s.loanInfo}>
+                      <Text style={s.loanTitle}>{livro.titulo}</Text>
+                      <Text style={s.loanAuthor}>{livro.autor}</Text>
+                      <View style={[s.badgeSmall, { backgroundColor: livro.disponiveis > 0 ? 'rgba(74,124,89,0.12)' : 'rgba(184,76,46,0.12)' }]}>
+                        <Text style={[s.badgeText, { color: livro.disponiveis > 0 ? CORES.sage : CORES.rust }]}>
+                          {livro.disponiveis > 0 ? `✓ ${livro.disponiveis} disponível(is)` : '✗ Indisponível'}
+                        </Text>
+                      </View>
+                    </View>
                   </View>
-                </View>
-              </View>
-            ))
+                ))}
+                {totalPaginasGestao > 1 && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, gap: 8 }}>
+                    <TouchableOpacity
+                      style={[s.btnSecundario, { flex: 1, opacity: paginaGestao <= 1 ? 0.4 : 1 }]}
+                      disabled={paginaGestao <= 1}
+                      onPress={() => setPaginaGestao(p => p - 1)}>
+                      <Text style={s.btnSecundarioText}>← Anterior</Text>
+                    </TouchableOpacity>
+                    <Text style={{ color: CORES.muted, fontSize: 13, minWidth: 60, textAlign: 'center' }}>
+                      {paginaGestao}/{totalPaginasGestao}
+                    </Text>
+                    <TouchableOpacity
+                      style={[s.btnSecundario, { flex: 1, opacity: paginaGestao >= totalPaginasGestao ? 0.4 : 1 }]}
+                      disabled={paginaGestao >= totalPaginasGestao}
+                      onPress={() => setPaginaGestao(p => p + 1)}>
+                      <Text style={s.btnSecundarioText}>Próxima →</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </>
+            )
           }
         </View>
       </ScrollView>
