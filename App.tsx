@@ -251,6 +251,9 @@ export default function App() {
   const [paginaLivros, setPaginaLivros] = useState(1);
   const [paginaHome, setPaginaHome] = useState(1);
   const [paginaHomeProfessor, setPaginaHomeProfessor] = useState(1);
+  const [paginaGestao, setPaginaGestao] = useState(1);
+  const [paginaAdminLivros, setPaginaAdminLivros] = useState(1);
+  const [paginaAdminUsuarios, setPaginaAdminUsuarios] = useState(1);
 
   const [todasAvaliacoes, setTodasAvaliacoes] = useState<Avaliacao[]>([]);
   const [telaResenha, setTelaResenha] = useState(false);
