@@ -72,12 +72,11 @@ const ESCOLA = 'E. E. Cel. Jose Venancio de Souza';
 const BIBLIOTECA = 'Biblioteca Marlene de Souza Queiroz';
 
 function calcularProgresso(emp: Emprestimo): number {
-  if (!emp.dataReserva || !emp.dataDevolucao) return 50;
-  const inicio = new Date(emp.dataReserva).getTime();
-  const fim = new Date(emp.dataDevolucao).getTime();
-  const agora = Date.now();
-  const total = fim - inicio;
-  const decorrido = agora - inicio;
+  const inicio = emp.dataRetirada ?? emp.dataReserva;
+  const fim = emp.dataPrevistaDevolucao;
+  if (!inicio || !fim) return 50;
+  const total = new Date(fim).getTime() - new Date(inicio).getTime();
+  const decorrido = Date.now() - new Date(inicio).getTime();
   if (total <= 0) return 100;
   return Math.min(100, Math.max(0, Math.round((decorrido / total) * 100)));
 }
