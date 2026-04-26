@@ -2608,7 +2608,10 @@ export default function App() {
         </View>
         <View style={s.tabBar}>
           {abasBiblio.map(aba => (
-            <TouchableOpacity key={aba.key} style={s.tabItem} onPress={() => setAbaBiblio(aba.key as AbaBiblio)}>
+            <TouchableOpacity key={aba.key} style={s.tabItem} onPress={() => {
+              setAbaBiblio(aba.key as AbaBiblio);
+              if (aba.key === 'admin') carregarDados();
+            }}>
               <Text style={{ fontSize: 20 }}>{aba.icon}</Text>
               <Text style={[s.tabLabel, abaBiblio === aba.key && { color: CORES.amber, fontWeight: '600' }]}>
                 {aba.label}
