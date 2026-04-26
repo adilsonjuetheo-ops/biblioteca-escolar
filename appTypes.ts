@@ -1,4 +1,4 @@
-export type Perfil = 'aluno' | 'professor' | 'bibliotecario';
+export type Perfil = 'aluno' | 'professor' | 'bibliotecario' | 'coordenacao';
 export type Tela =
   | 'login'
   | 'cadastroAluno'
