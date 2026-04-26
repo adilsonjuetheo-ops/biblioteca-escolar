@@ -376,6 +376,21 @@ export default function App() {
     (paginaHomeProfessor - 1) * LIVROS_POR_PAGINA,
     paginaHomeProfessor * LIVROS_POR_PAGINA,
   );
+  const totalPaginasGestao = Math.max(1, Math.ceil(livros.length / LIVROS_POR_PAGINA));
+  const livrosPaginadosGestao = livros.slice(
+    (paginaGestao - 1) * LIVROS_POR_PAGINA,
+    paginaGestao * LIVROS_POR_PAGINA,
+  );
+  const totalPaginasAdminLivros = Math.max(1, Math.ceil(livros.length / LIVROS_POR_PAGINA));
+  const livrosPaginadosAdmin = livros.slice(
+    (paginaAdminLivros - 1) * LIVROS_POR_PAGINA,
+    paginaAdminLivros * LIVROS_POR_PAGINA,
+  );
+  const totalPaginasAdminUsuarios = Math.max(1, Math.ceil(usuariosAdmin.length / LIVROS_POR_PAGINA));
+  const usuariosPaginadosAdmin = usuariosAdmin.slice(
+    (paginaAdminUsuarios - 1) * LIVROS_POR_PAGINA,
+    paginaAdminUsuarios * LIVROS_POR_PAGINA,
+  );
 
   function handleBuscaChange(text: string) {
     setBuscaInput(text);
