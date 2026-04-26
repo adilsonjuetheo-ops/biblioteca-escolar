@@ -2812,7 +2812,9 @@ export default function App() {
               </View>
             ) : meusAtivos.map(emp => {
               const hoje = new Date();
-              const dataDev = emp.dataDevolucao ? new Date(emp.dataDevolucao) : null;
+              const prevista = emp.dataPrevistaDevolucao
+                ?? (emp.dataRetirada ? new Date(new Date(emp.dataRetirada).getTime() + 8 * 24 * 60 * 60 * 1000).toISOString() : null);
+              const dataDev = prevista && emp.status === 'retirado' ? new Date(prevista) : null;
               const diasRestantes = dataDev
                 ? Math.ceil((dataDev.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24))
                 : null;
