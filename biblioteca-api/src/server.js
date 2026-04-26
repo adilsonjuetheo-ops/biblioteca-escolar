@@ -725,9 +725,9 @@ app.post('/emprestimos/:id/qr-retirada', verifyToken, async (req, res) => {
     return;
   }
 
-  // Apenas o dono do empréstimo ou bibliotecario pode gerar o QR
+  // Apenas o dono do empréstimo ou admin pode gerar o QR
   const { id: reqId, perfil } = req.usuario;
-  if (perfil !== 'bibliotecario' && emprestimo.usuarioId !== reqId) {
+  if (!isAdmin(perfil) && emprestimo.usuarioId !== reqId) {
     res.status(403).json({ erro: 'Voce nao pode gerar QR para este emprestimo.' });
     return;
   }
