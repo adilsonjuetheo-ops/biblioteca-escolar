@@ -2218,7 +2218,7 @@ export default function App() {
       <ScrollView style={{ flex: 1 }}>
         <View style={s.homeHeader}>
           <View>
-            <Text style={s.homeGreeting}>Painel do Bibliotecário</Text>
+            <Text style={s.homeGreeting}>{usuario?.perfil === 'coordenacao' ? 'Painel da Coordenação' : 'Painel do Bibliotecário'}</Text>
             <Text style={s.homeName}>{usuario?.nome}</Text>
           </View>
           <View style={s.homeAvatarSmall}>
