@@ -1867,8 +1867,7 @@ export default function App() {
                   </Text>
                 ) : null}
 
-                {/* ── DATA DE DEVOLUÇÃO ── */}
-                {dataDev && emp.status === 'retirado' ? (
+                {dataDev ? (
                   <View style={{ marginTop: 6 }}>
                     <Text style={[s.loanAuthor, {
                       color: atrasado ? CORES.rust : urgente ? CORES.amber : CORES.sage,
