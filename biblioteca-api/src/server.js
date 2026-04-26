@@ -644,7 +644,7 @@ app.get('/usuarios', verifyToken, requirePerfil('bibliotecario', 'professor'), a
 app.get('/emprestimos', verifyToken, async (req, res) => {
   const db = await readDb();
   const { perfil, id } = req.usuario;
-  if (perfil === 'bibliotecario' || perfil === 'professor') {
+  if (isAdmin(perfil) || perfil === 'professor') {
     res.json(db.emprestimos);
   } else {
     res.json(db.emprestimos.filter((e) => e.usuarioId === id));
