@@ -246,11 +246,11 @@ app.get('/dashboard', verifyToken, async (req, res) => {
   const usuariosBase = Array.isArray(fatias.usuarios) ? fatias.usuarios : [];
   const suspensoes = Array.isArray(fatias.suspensoes) ? fatias.suspensoes : [];
 
-  const emprestimos = (perfil === 'bibliotecario' || perfil === 'professor')
+  const emprestimos = (isAdmin(perfil) || perfil === 'professor')
     ? emprestimosBase
     : emprestimosBase.filter((e) => e.usuarioId === id);
 
-  const desejos = (perfil === 'bibliotecario' || perfil === 'professor')
+  const desejos = (isAdmin(perfil) || perfil === 'professor')
     ? desejosBase.filter((d) => !req.query.usuarioId || d.usuarioId === req.query.usuarioId)
     : desejosBase.filter((d) => d.usuarioId === id);
 
