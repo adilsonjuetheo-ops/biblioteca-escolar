@@ -775,10 +775,12 @@ app.patch('/emprestimos/retirada-qr', verifyToken, requirePerfil('bibliotecario'
       return { status: 400, erro: 'QR invalido ou expirado.' };
     }
 
+    const agora8d = new Date();
     emprestimo.status = 'retirado';
-    emprestimo.dataRetirada = new Date().toISOString();
-    emprestimo.retiradaQrUsadoEm = new Date().toISOString();
-    emprestimo.atualizadoEm = new Date().toISOString();
+    emprestimo.dataRetirada = agora8d.toISOString();
+    emprestimo.dataPrevistaDevolucao = new Date(agora8d.getTime() + 8 * 24 * 60 * 60 * 1000).toISOString();
+    emprestimo.retiradaQrUsadoEm = agora8d.toISOString();
+    emprestimo.atualizadoEm = agora8d.toISOString();
 
     await writeDb(db);
     return { status: 200, emprestimo };
