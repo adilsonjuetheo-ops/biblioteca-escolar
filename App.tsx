@@ -2330,6 +2330,11 @@ export default function App() {
             <Text style={s.homeName}>{usuariosAdmin.length} usuários</Text>
           </View>
         </View>
+        <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
+          <TouchableOpacity style={[s.btnSecundario, { marginBottom: 12 }]} onPress={() => carregarDados()}>
+            <Text style={s.btnSecundarioText}>↻  Atualizar</Text>
+          </TouchableOpacity>
+        </View>
         <View style={{ padding: 16 }}>
 
           {/* ── CADASTRO POR FOTO ── */}
