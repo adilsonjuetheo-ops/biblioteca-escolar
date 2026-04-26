@@ -2839,7 +2839,7 @@ export default function App() {
                         Reservado em {new Date(emp.dataReserva).toLocaleDateString('pt-BR')}
                       </Text>
                     ) : null}
-                    {dataDev && emp.status === 'retirado' ? (
+                    {dataDev ? (
                       <View style={{ marginTop: 6 }}>
                         <Text style={[s.loanAuthor, {
                           color: atrasado ? CORES.rust : urgente ? CORES.amber : CORES.sage,
