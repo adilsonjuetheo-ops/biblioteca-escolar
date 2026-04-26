@@ -810,10 +810,12 @@ app.patch('/emprestimos/:id/retirar', verifyToken, requirePerfil('bibliotecario'
       return { status: 409, erro: 'Apenas emprestimos reservados podem ser retirados.' };
     }
 
+    const agora8dm = new Date();
     invalidatePickupQr(emprestimo, 'retirada-manual');
     emprestimo.status = 'retirado';
-    emprestimo.dataRetirada = new Date().toISOString();
-    emprestimo.atualizadoEm = new Date().toISOString();
+    emprestimo.dataRetirada = agora8dm.toISOString();
+    emprestimo.dataPrevistaDevolucao = new Date(agora8dm.getTime() + 8 * 24 * 60 * 60 * 1000).toISOString();
+    emprestimo.atualizadoEm = agora8dm.toISOString();
     await writeDb(db);
     return { status: 200, emprestimo };
   });
