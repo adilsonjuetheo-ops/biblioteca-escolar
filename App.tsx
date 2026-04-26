@@ -2549,34 +2549,84 @@ export default function App() {
             <View style={s.emptyBox}>
               <Text style={s.emptyText}>Nenhum usuário encontrado</Text>
             </View>
-          ) : usuariosAdmin.map(u => (
-            <View key={u.id} style={s.menuItem}>
-              <View style={s.menuIcon}><Text style={{ fontSize: 16 }}>👤</Text></View>
-              <View style={{ flex: 1 }}>
-                <Text style={s.menuTitle}>{u.nome}</Text>
-                <Text style={s.menuSub}>{u.email}</Text>
-              </View>
-              <View style={[s.badgeSmall, { backgroundColor: 'rgba(201,123,46,0.12)', marginTop: 0 }]}>
-                <Text style={[s.badgeText, { color: CORES.amber }]}>{u.perfil}</Text>
-              </View>
-            </View>
-          ))}
+          ) : (
+            <>
+              {usuariosPaginadosAdmin.map(u => (
+                <View key={u.id} style={s.menuItem}>
+                  <View style={s.menuIcon}><Text style={{ fontSize: 16 }}>👤</Text></View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.menuTitle}>{u.nome}</Text>
+                    <Text style={s.menuSub}>{u.email}</Text>
+                  </View>
+                  <View style={[s.badgeSmall, { backgroundColor: 'rgba(201,123,46,0.12)', marginTop: 0 }]}>
+                    <Text style={[s.badgeText, { color: CORES.amber }]}>{u.perfil}</Text>
+                  </View>
+                </View>
+              ))}
+              {totalPaginasAdminUsuarios > 1 && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, gap: 8 }}>
+                  <TouchableOpacity
+                    style={[s.btnSecundario, { flex: 1, opacity: paginaAdminUsuarios <= 1 ? 0.4 : 1 }]}
+                    disabled={paginaAdminUsuarios <= 1}
+                    onPress={() => setPaginaAdminUsuarios(p => p - 1)}>
+                    <Text style={s.btnSecundarioText}>← Anterior</Text>
+                  </TouchableOpacity>
+                  <Text style={{ color: CORES.muted, fontSize: 13, minWidth: 60, textAlign: 'center' }}>
+                    {paginaAdminUsuarios}/{totalPaginasAdminUsuarios}
+                  </Text>
+                  <TouchableOpacity
+                    style={[s.btnSecundario, { flex: 1, opacity: paginaAdminUsuarios >= totalPaginasAdminUsuarios ? 0.4 : 1 }]}
+                    disabled={paginaAdminUsuarios >= totalPaginasAdminUsuarios}
+                    onPress={() => setPaginaAdminUsuarios(p => p + 1)}>
+                    <Text style={s.btnSecundarioText}>Próxima →</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </>
+          )}
           <Text style={[s.sectionLabel, { marginTop: 16 }]}>LIVROS CADASTRADOS</Text>
           {livros.length === 0 ? (
             <View style={s.emptyBox}>
               <Text style={s.emptyText}>Nenhum livro cadastrado</Text>
             </View>
-          ) : livros.map(livro => (
-            <View key={livro.id} style={s.loanCard}>
-              <View style={[s.loanCover, { backgroundColor: CORES.ink }]} />
-              <View style={s.loanInfo}>
-                <Text style={s.loanTitle}>{livro.titulo}</Text>
-                <Text style={s.loanAuthor}>{livro.autor || '—'}</Text>
-                <Text style={s.loanAuthor}>Exemplares: {livro.totalExemplares || 0}</Text>
-                <Text style={[s.loanAuthor, { color: Number(livro.disponiveis) > 0 ? CORES.sage : CORES.rust }]}>Disponíveis: {livro.disponiveis || 0}</Text>
-              </View>
-            </View>
-          ))}
+          ) : (
+            <>
+              {livrosPaginadosAdmin.map(livro => (
+                <View key={livro.id} style={s.loanCard}>
+                  {livro.capa ? (
+                    <Image source={{ uri: livro.capa }} style={s.loanCover} resizeMode="cover" />
+                  ) : (
+                    <View style={[s.loanCover, { backgroundColor: CORES.ink }]} />
+                  )}
+                  <View style={s.loanInfo}>
+                    <Text style={s.loanTitle}>{livro.titulo}</Text>
+                    <Text style={s.loanAuthor}>{livro.autor || '—'}</Text>
+                    <Text style={s.loanAuthor}>Exemplares: {livro.totalExemplares || 0}</Text>
+                    <Text style={[s.loanAuthor, { color: Number(livro.disponiveis) > 0 ? CORES.sage : CORES.rust }]}>Disponíveis: {livro.disponiveis || 0}</Text>
+                  </View>
+                </View>
+              ))}
+              {totalPaginasAdminLivros > 1 && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, gap: 8 }}>
+                  <TouchableOpacity
+                    style={[s.btnSecundario, { flex: 1, opacity: paginaAdminLivros <= 1 ? 0.4 : 1 }]}
+                    disabled={paginaAdminLivros <= 1}
+                    onPress={() => setPaginaAdminLivros(p => p - 1)}>
+                    <Text style={s.btnSecundarioText}>← Anterior</Text>
+                  </TouchableOpacity>
+                  <Text style={{ color: CORES.muted, fontSize: 13, minWidth: 60, textAlign: 'center' }}>
+                    {paginaAdminLivros}/{totalPaginasAdminLivros}
+                  </Text>
+                  <TouchableOpacity
+                    style={[s.btnSecundario, { flex: 1, opacity: paginaAdminLivros >= totalPaginasAdminLivros ? 0.4 : 1 }]}
+                    disabled={paginaAdminLivros >= totalPaginasAdminLivros}
+                    onPress={() => setPaginaAdminLivros(p => p + 1)}>
+                    <Text style={s.btnSecundarioText}>Próxima →</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </>
+          )}
         </View>
       </ScrollView>
     );
