@@ -1879,7 +1879,11 @@ export default function App() {
 
           return (
             <View key={emp.id} style={[s.loanCard, atrasado && { borderColor: CORES.rust, borderWidth: 1.5 }]}>
-              <View style={[s.loanCover, { backgroundColor: CORES.sage }]} />
+              {emp.capa ? (
+                <Image source={{ uri: emp.capa }} style={s.loanCover} resizeMode="cover" />
+              ) : (
+                <View style={[s.loanCover, { backgroundColor: CORES.sage }]} />
+              )}
               <View style={s.loanInfo}>
                 <Text style={s.loanTitle}>{emp.livroTitulo || `Livro #${emp.livroId}`}</Text>
                 <Text style={s.loanAuthor}>{emp.livroAutor || '—'}</Text>
