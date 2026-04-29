@@ -3,6 +3,7 @@ import { API_BASE_URL } from '../apiConfig';
 
 export const http = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 15000,
 });
 
 export function setApiAuthToken(token: string | null | undefined) {
