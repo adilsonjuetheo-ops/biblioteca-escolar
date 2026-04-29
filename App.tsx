@@ -1876,11 +1876,12 @@ export default function App() {
             : null;
           const atrasado = diasRestantes !== null && diasRestantes < 0;
           const urgente = diasRestantes !== null && diasRestantes >= 0 && diasRestantes <= 3;
+          const capaUrl = emp.capa || livros.find(l => l.id === emp.livroId)?.capa || '';
 
           return (
             <View key={emp.id} style={[s.loanCard, atrasado && { borderColor: CORES.rust, borderWidth: 1.5 }]}>
-              {emp.capa ? (
-                <Image source={{ uri: emp.capa }} style={s.loanCover} resizeMode="cover" />
+              {capaUrl ? (
+                <Image source={{ uri: capaUrl }} style={s.loanCover} resizeMode="cover" />
               ) : (
                 <View style={[s.loanCover, { backgroundColor: CORES.sage }]} />
               )}
