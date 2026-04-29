@@ -407,9 +407,7 @@ export default function App() {
   async function carregarDados(usuarioAtual = usuario) {
     setCarregando(true);
     setErroConexao(false);
-    setReconectando(false);
-
-    async function tentarCarregar() {
+    try {
       const uid = usuarioAtual?.id;
       const dados = await carregarDadosBiblioteca(usuarioAtual);
       setLivros(Array.isArray(dados.livros) ? dados.livros : []);
@@ -427,20 +425,8 @@ export default function App() {
       setUsuariosAdmin(Array.isArray(dados.usuarios) ? dados.usuarios : []);
       setComunicados(Array.isArray(dados.comunicados) ? dados.comunicados : []);
       setSuspensoes(Array.isArray(dados.suspensoes) ? dados.suspensoes : []);
-    }
-
-    try {
-      await tentarCarregar();
     } catch {
-      // Primeira falha: servidor provavelmente dormindo. Tenta mais uma vez.
-      setReconectando(true);
-      try {
-        await tentarCarregar();
-      } catch {
-        setErroConexao(true);
-      } finally {
-        setReconectando(false);
-      }
+      setErroConexao(true);
     } finally {
       setCarregando(false);
     }
