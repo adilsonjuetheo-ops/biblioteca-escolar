@@ -2273,10 +2273,12 @@ export default function App() {
                 <View style={s.emptyBox}>
                   <Text style={s.emptyText}>Nenhum empréstimo ativo</Text>
                 </View>
-              ) : emprestimosAtivos.map(emp => (
+              ) : emprestimosAtivos.map(emp => {
+                const capaUrl = emp.capa || livros.find(l => l.id === emp.livroId)?.capa || '';
+                return (
                 <View key={emp.id} style={s.loanCard}>
-                  {emp.capa ? (
-                    <Image source={{ uri: emp.capa }} style={s.loanCover} resizeMode="cover" />
+                  {capaUrl ? (
+                    <Image source={{ uri: capaUrl }} style={s.loanCover} resizeMode="cover" />
                   ) : (
                     <View style={[s.loanCover, { backgroundColor: CORES.sage }]} />
                   )}
