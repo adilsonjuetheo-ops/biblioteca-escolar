@@ -2315,7 +2315,8 @@ export default function App() {
                     <Text style={s.btnAmberText}>🚫 Bloquear</Text>
                   </TouchableOpacity>
                 </View>
-              ))}
+              );
+              })}
             </>
           )}
         </View>
