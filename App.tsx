@@ -406,7 +406,6 @@ export default function App() {
   async function carregarDados(usuarioAtual = usuario) {
     setCarregando(true);
     setErroConexao(false);
-    const guardsaida = setTimeout(() => setCarregando(false), 20000);
     try {
       const uid = usuarioAtual?.id;
       const dados = await carregarDadosBiblioteca(usuarioAtual);
@@ -428,7 +427,6 @@ export default function App() {
     } catch {
       setErroConexao(true);
     } finally {
-      clearTimeout(guardsaida);
       setCarregando(false);
     }
   }
