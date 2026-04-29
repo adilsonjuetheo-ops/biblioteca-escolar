@@ -2234,7 +2234,14 @@ export default function App() {
           <TouchableOpacity style={[s.btnSecundario, { marginBottom: 12 }]} onPress={() => carregarDados()}>
             <Text style={s.btnSecundarioText}>↻  Atualizar painel</Text>
           </TouchableOpacity>
-          {carregando ? <ActivityIndicator color={CORES.amber} size="large" style={{ marginTop: 40 }} /> : (
+          {carregando ? <ActivityIndicator color={CORES.amber} size="large" style={{ marginTop: 40 }} /> : erroConexao ? (
+            <View style={s.emptyBox}>
+              <Text style={[s.emptyText, { color: CORES.rust, marginBottom: 12 }]}>Falha ao carregar dados.{'\n'}Verifique sua conexão.</Text>
+              <TouchableOpacity style={s.btnSecundario} onPress={() => carregarDados()}>
+                <Text style={s.btnSecundarioText}>↻  Tentar novamente</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
             <>
               <View style={s.statsRow}>
                 {[
