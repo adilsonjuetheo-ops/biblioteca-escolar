@@ -98,7 +98,8 @@ export async function carregarDadosBiblioteca(usuarioAtual?: Usuario | null): Pr
       if (axios.isAxiosError(e) && e.response?.status === 404) {
         dashboardEndpointAvailable = false;
       } else {
-        logAxiosError('[GET /dashboard]', e);
+        // Qualquer outro erro (timeout, rede, 4xx/5xx) — propaga direto
+        throw e;
       }
     }
   }
