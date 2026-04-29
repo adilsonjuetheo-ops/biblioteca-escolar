@@ -406,13 +406,14 @@ export default function App() {
   async function carregarDados(usuarioAtual = usuario) {
     setCarregando(true);
     setErroConexao(false);
+    const guardsaida = setTimeout(() => setCarregando(false), 20000);
     try {
       const uid = usuarioAtual?.id;
       const dados = await carregarDadosBiblioteca(usuarioAtual);
       setLivros(Array.isArray(dados.livros) ? dados.livros : []);
       const todosEmprestimos: Emprestimo[] = Array.isArray(dados.emprestimos) ? dados.emprestimos : [];
       const perfil = usuarioAtual?.perfil;
-      const isBiblio = perfil !== 'aluno' && perfil !== 'professor';
+      const isBiblio = !!perfil && perfil !== 'aluno' && perfil !== 'professor';
       const ativos = todosEmprestimos.filter(e => e.status === 'reservado' || e.status === 'retirado');
       const devolvidos = todosEmprestimos.filter(e => e.status === 'devolvido');
       const isProf = perfil === 'professor';
@@ -427,6 +428,7 @@ export default function App() {
     } catch {
       setErroConexao(true);
     } finally {
+      clearTimeout(guardsaida);
       setCarregando(false);
     }
   }
