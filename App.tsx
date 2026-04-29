@@ -309,6 +309,7 @@ export default function App() {
   const [scannerFeedback, setScannerFeedback] = useState<ScannerFeedback | null>(null);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [erroConexao, setErroConexao] = useState(false);
+  const [reconectando, setReconectando] = useState(false);
   const [suspensoes, setSuspensoes] = useState<Suspensao[]>([]);
   const [comunicados, setComunicados] = useState<Comunicado[]>([]);
 
