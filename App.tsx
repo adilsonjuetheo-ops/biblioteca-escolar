@@ -404,7 +404,6 @@ export default function App() {
   const generosUnicos = ['todos', ...Array.from(new Set(livros.map(l => l.genero).filter(Boolean))) as string[]];
 
   async function carregarDados(usuarioAtual = usuario) {
-    if (carregando) return;
     setCarregando(true);
     setErroConexao(false);
     try {
