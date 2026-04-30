@@ -97,10 +97,11 @@ export async function carregarDadosBiblioteca(usuarioAtual?: Usuario | null): Pr
     } catch (e: unknown) {
       if (axios.isAxiosError(e) && e.response?.status === 404) {
         dashboardEndpointAvailable = false;
-      } else {
-        // Qualquer outro erro (timeout, rede, 4xx/5xx) — propaga direto
+      } else if (axios.isAxiosError(e) && e.response) {
+        // Erro HTTP com resposta (4xx/5xx) — propaga
         throw e;
       }
+      // Erro de rede/cold start (sem resposta) — usa fallback individual
     }
   }
 
