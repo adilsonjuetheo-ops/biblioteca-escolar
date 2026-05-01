@@ -158,6 +158,40 @@ function parseAllowedOrigins() {
     .filter(Boolean);
 }
 
+// ── Push Notifications (Expo Push API) ───────────────────────────────────────
+
+async function enviarPushNotificacao(usuarios, pushTokens, destinatario, titulo, corpo) {
+  try {
+    let tokens;
+    if (destinatario === 'todos') {
+      tokens = pushTokens.map(pt => pt.token);
+    } else {
+      const perfisAlvo = destinatario === 'alunos'
+        ? new Set(['aluno'])
+        : new Set(['professor', 'bibliotecario', 'coordenacao']);
+      const idsAlvo = new Set(usuarios.filter(u => perfisAlvo.has(u.perfil)).map(u => u.id));
+      tokens = pushTokens.filter(pt => idsAlvo.has(pt.usuarioId)).map(pt => pt.token);
+    }
+    if (tokens.length === 0) return;
+    for (let i = 0; i < tokens.length; i += 100) {
+      const batch = tokens.slice(i, i + 100).map(token => ({
+        to: token,
+        title: titulo,
+        body: corpo,
+        sound: 'default',
+        data: { tipo: 'comunicado' },
+      }));
+      await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify(batch),
+      });
+    }
+  } catch (err) {
+    console.error('[Push] Falha ao enviar notificacoes:', err.message);
+  }
+}
+
 // ── Middlewares de autenticação e autorização ─────────────────────────────────
 
 function verifyToken(req, res, next) {
