@@ -2799,7 +2799,20 @@ export default function App() {
   // ── TELAS DO PROFESSOR ──
   if (tela === 'professor') {
     const renderHomeProfessor = () => (
-      <ScrollView style={{ flex: 1 }}>
+      <ScrollView
+        style={{ flex: 1 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => carregarDados(usuario, { pull: true })}
+            tintColor={CORES.amber}
+            colors={[CORES.amber]}
+          />
+        }
+      >
+        {atualizandoBg && (
+          <Text style={{ fontSize: 11, color: CORES.muted, textAlign: 'center', paddingTop: 4 }}>Atualizando...</Text>
+        )}
         <View style={s.homeHeader}>
           <View>
             <Text style={s.homeGreeting}>{saudacaoPorHorario}, Professor(a) 👋</Text>
