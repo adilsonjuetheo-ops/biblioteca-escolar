@@ -143,7 +143,7 @@ export async function carregarDadosBiblioteca(usuarioAtual?: Usuario | null): Pr
     safeGet('/suspensoes', [] as Suspensao[]),
   ]);
 
-  return {
+  const fallbackResult: DashboardData = {
     livros,
     emprestimos,
     avaliacoes,
@@ -152,6 +152,8 @@ export async function carregarDadosBiblioteca(usuarioAtual?: Usuario | null): Pr
     comunicados: comunicados.map(normalizarComunicado),
     suspensoes,
   };
+  if (uid) cachedDashboard = { data: fallbackResult, userId: uid };
+  return fallbackResult;
 }
 
 export async function login(email: string, senha: string) {
