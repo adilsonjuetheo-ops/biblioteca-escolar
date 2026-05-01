@@ -351,7 +351,6 @@ app.post('/usuarios/login', async (req, res) => {
   }
 
   const db = await readDb();
-  console.log('[LOGIN] usuarios no banco:', db.usuarios.length, '| email buscado:', emailNormalizado);
   const usuario = db.usuarios.find((u) => u.email === emailNormalizado);
   if (!usuario) {
     registrarFalhaLogin(ip);
