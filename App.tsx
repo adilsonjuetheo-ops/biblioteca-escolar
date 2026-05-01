@@ -2391,54 +2391,105 @@ export default function App() {
                 </TouchableOpacity>
               </View>
               <Text style={s.sectionLabel}>EMPRÉSTIMOS ATIVOS</Text>
-              {emprestimosAtivos.length === 0 ? (
-                <View style={s.emptyBox}>
-                  <Text style={s.emptyText}>Nenhum empréstimo ativo</Text>
-                </View>
-              ) : emprestimosAtivos.map(emp => {
-                const capaUrl = emp.capa || livros.find(l => l.id === emp.livroId)?.capa || '';
+              {(() => {
+                const turmasUnicas = ['todas', ...Array.from(new Set(emprestimosAtivos.map(e => e.usuarioTurma).filter(Boolean))) as string[]];
+                const empFiltrados = emprestimosAtivos.filter(e => {
+                  const turmaOk = filtroEmpTurma === 'todas' || e.usuarioTurma === filtroEmpTurma;
+                  const statusOk = filtroEmpStatus === 'todos' || e.status === filtroEmpStatus;
+                  return turmaOk && statusOk;
+                });
                 return (
-                <View key={emp.id} style={s.loanCard}>
-                  {capaUrl ? (
-                    <Image source={{ uri: capaUrl }} style={s.loanCover} resizeMode="cover" />
-                  ) : (
-                    <View style={[s.loanCover, { backgroundColor: CORES.sage }]} />
-                  )}
-                  <View style={s.loanInfo}>
-                    <Text style={s.loanTitle}>{emp.livroTitulo || `Livro #${emp.livroId}`}</Text>
-                    <Text style={s.loanAuthor}>{emp.usuarioNome || `Usuário #${emp.usuarioId}`}</Text>
-                    {emp.usuarioTurma ? (
-                      <Text style={[s.loanAuthor, { color: CORES.amber }]}>Turma {emp.usuarioTurma}</Text>
-                    ) : null}
-                    <View style={[s.badgeSmall, { backgroundColor: 'rgba(201,123,46,0.12)', marginTop: 6 }]}>
-                      <Text style={[s.badgeText, { color: CORES.amber }]}>{emp.status}</Text>
+                  <>
+                    <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+                      {([
+                        { key: 'todos', label: 'Todos' },
+                        { key: 'reservado', label: 'Reservados' },
+                        { key: 'retirado', label: 'Retirados' },
+                      ] as const).map(f => (
+                        <TouchableOpacity key={f.key}
+                          style={[s.filtroBtn, filtroEmpStatus === f.key && s.filtroBtnAtivo]}
+                          onPress={() => setFiltroEmpStatus(f.key)}>
+                          <Text style={[s.filtroText, filtroEmpStatus === f.key && s.filtroTextAtivo]}>{f.label}</Text>
+                        </TouchableOpacity>
+                      ))}
                     </View>
-                  </View>
-                  <TouchableOpacity style={s.btnAmber} onPress={() => handleDevolucao(emp)}>
-                    <Text style={s.btnAmberText}>Devolver</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[s.btnAmber, { backgroundColor: CORES.rust, paddingHorizontal: 8, marginTop: 4 }]}
-                    onPress={() => {
-                      Alert.prompt(
-                        'Bloquear aluno',
-                        'Quantos dias de bloqueio?',
-                        (dias) => {
-                          if (!dias || isNaN(Number(dias))) return;
-                          Alert.prompt('Motivo', 'Informe o motivo (opcional)', (motivo) => {
-                            handleAplicarSuspensao(emp, Number(dias), motivo || 'Devolução em atraso');
-                          });
-                        },
-                        'plain-text',
-                        '',
-                        'number-pad'
+                    {turmasUnicas.length > 1 && (
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                          {turmasUnicas.map(t => (
+                            <TouchableOpacity key={t}
+                              style={[s.filtroBtn, filtroEmpTurma === t && s.filtroBtnAtivo]}
+                              onPress={() => setFiltroEmpTurma(t)}>
+                              <Text style={[s.filtroText, filtroEmpTurma === t && s.filtroTextAtivo]}>
+                                {t === 'todas' ? 'Todas turmas' : `Turma ${t}`}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      </ScrollView>
+                    )}
+                    {empFiltrados.length === 0 ? (
+                      <View style={s.emptyBox}>
+                        <Text style={s.emptyText}>Nenhum empréstimo ativo{filtroEmpTurma !== 'todas' || filtroEmpStatus !== 'todos' ? ' com estes filtros' : ''}</Text>
+                      </View>
+                    ) : empFiltrados.map(emp => {
+                      const capaUrl = emp.capa || livros.find(l => l.id === emp.livroId)?.capa || '';
+                      const diasVencer = emp.dataPrevistaDevolucao
+                        ? Math.ceil((new Date(emp.dataPrevistaDevolucao).getTime() - Date.now()) / 86400000)
+                        : null;
+                      const alertaVencendo = diasVencer !== null && diasVencer <= 2;
+                      return (
+                        <View key={emp.id} style={[s.loanCard, alertaVencendo && { borderLeftWidth: 3, borderLeftColor: diasVencer! < 0 ? CORES.rust : CORES.amber }]}>
+                          {capaUrl ? (
+                            <Image source={{ uri: capaUrl }} style={s.loanCover} resizeMode="cover" />
+                          ) : (
+                            <View style={[s.loanCover, { backgroundColor: CORES.sage }]} />
+                          )}
+                          <View style={s.loanInfo}>
+                            <Text style={s.loanTitle}>{emp.livroTitulo || `Livro #${emp.livroId}`}</Text>
+                            <Text style={s.loanAuthor}>{emp.usuarioNome || `Usuário #${emp.usuarioId}`}</Text>
+                            {emp.usuarioTurma ? (
+                              <Text style={[s.loanAuthor, { color: CORES.amber }]}>Turma {emp.usuarioTurma}</Text>
+                            ) : null}
+                            <View style={[s.badgeSmall, { backgroundColor: 'rgba(201,123,46,0.12)', marginTop: 6 }]}>
+                              <Text style={[s.badgeText, { color: CORES.amber }]}>{emp.status}</Text>
+                            </View>
+                            {alertaVencendo && (
+                              <View style={[s.badgeSmall, { backgroundColor: diasVencer! < 0 ? 'rgba(184,76,46,0.15)' : 'rgba(201,123,46,0.15)', marginTop: 4 }]}>
+                                <Text style={[s.badgeText, { color: diasVencer! < 0 ? CORES.rust : CORES.amber }]}>
+                                  {diasVencer! < 0 ? `⏰ Atrasado ${Math.abs(diasVencer!)}d` : diasVencer === 0 ? '⏰ Vence hoje' : `⏰ Vence em ${diasVencer}d`}
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+                          <TouchableOpacity style={s.btnAmber} onPress={() => handleDevolucao(emp)}>
+                            <Text style={s.btnAmberText}>Devolver</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[s.btnAmber, { backgroundColor: CORES.rust, paddingHorizontal: 8, marginTop: 4 }]}
+                            onPress={() => {
+                              Alert.prompt(
+                                'Bloquear aluno',
+                                'Quantos dias de bloqueio?',
+                                (dias) => {
+                                  if (!dias || isNaN(Number(dias))) return;
+                                  Alert.prompt('Motivo', 'Informe o motivo (opcional)', (motivo) => {
+                                    handleAplicarSuspensao(emp, Number(dias), motivo || 'Devolução em atraso');
+                                  });
+                                },
+                                'plain-text',
+                                '',
+                                'number-pad'
+                              );
+                            }}>
+                            <Text style={s.btnAmberText}>🚫 Bloquear</Text>
+                          </TouchableOpacity>
+                        </View>
                       );
-                    }}>
-                    <Text style={s.btnAmberText}>🚫 Bloquear</Text>
-                  </TouchableOpacity>
-                </View>
-              );
-              })}
+                    })}
+                  </>
+                );
+              })()}
             </>
           )}
         </View>
