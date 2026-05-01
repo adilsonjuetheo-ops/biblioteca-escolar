@@ -3356,19 +3356,30 @@ export default function App() {
           {abaProfessor === 'perfil' && renderPerfilProfessor()}
         </View>
         <View style={s.tabBar}>
-          {abasProfessor.map(aba => (
-            <TouchableOpacity key={aba.key} style={s.tabItem}
-              onPress={() => {
-                const novaAba = aba.key as AbaProfessor;
-                setAbaProfessor(novaAba);
-                setLivroSelecionado(null);
-              }}>
-              <Text style={{ fontSize: 20 }}>{aba.icon}</Text>
-              <Text style={[s.tabLabel, abaProfessor === aba.key && { color: CORES.amber, fontWeight: '600' }]}>
-                {aba.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {abasProfessor.map(aba => {
+            const naoLidos = comunicados.filter(c => !comunicadosLidos.has(c.id)).length;
+            return (
+              <TouchableOpacity key={aba.key} style={s.tabItem}
+                onPress={() => {
+                  const novaAba = aba.key as AbaProfessor;
+                  setAbaProfessor(novaAba);
+                  setLivroSelecionado(null);
+                  if (novaAba === 'avisos') setComunicadosLidos(new Set(comunicados.map(c => c.id)));
+                }}>
+                <View style={{ position: 'relative' }}>
+                  <Text style={{ fontSize: 20 }}>{aba.icon}</Text>
+                  {aba.key === 'avisos' && naoLidos > 0 && (
+                    <View style={s.tabBadge}>
+                      <Text style={s.tabBadgeText}>{naoLidos > 9 ? '9+' : naoLidos}</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={[s.tabLabel, abaProfessor === aba.key && { color: CORES.amber, fontWeight: '600' }]}>
+                  {aba.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </SafeAreaView>
     );
