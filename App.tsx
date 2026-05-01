@@ -322,10 +322,6 @@ export default function App() {
   const [comunicadosLidos, setComunicadosLidos] = useState<Set<string>>(new Set());
   const [filtroEmpTurma, setFiltroEmpTurma] = useState('todas');
   const [filtroEmpStatus, setFiltroEmpStatus] = useState('todos');
-  const [novoComunicadoTitulo, setNovoComunicadoTitulo] = useState('');
-  const [novoComunicadoMensagem, setNovoComunicadoMensagem] = useState('');
-  const [novoComunicadoDestinatario, setNovoComunicadoDestinatario] = useState<'todos' | 'alunos' | 'professores'>('todos');
-  const [enviandoComunicado, setEnviandoComunicado] = useState(false);
 
   const [agora, setAgora] = useState(Date.now());
 
