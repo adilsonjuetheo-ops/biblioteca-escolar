@@ -41,15 +41,7 @@
     "platforms": ["android", "ios"],
     "plugins": [
       "expo-camera",
-      "expo-image-picker",
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/icon.png",
-          "color": "#c97b2e",
-          "defaultChannel": "default"
-        }
-      ]
+      "expo-image-picker"
     ],
     "extra": {
       "eas": {
