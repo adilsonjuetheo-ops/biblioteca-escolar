@@ -384,35 +384,9 @@ app.delete('/usuarios/me', verifyToken, async (req, res) => {
     db.emprestimos = (db.emprestimos || []).filter((e) => e.usuarioId !== id);
     db.desejos = (db.desejos || []).filter((d) => d.usuarioId !== id);
     db.avaliacoes = (db.avaliacoes || []).filter((a) => a.usuarioId !== id);
-    db.pushTokens = (db.pushTokens || []).filter((pt) => pt.usuarioId !== id);
     await writeDb(db);
   });
   res.json({ ok: true });
-});
-
-app.post('/usuarios/push-token', verifyToken, async (req, res) => {
-  const { token, plataforma } = req.body || {};
-  if (!token || typeof token !== 'string' || !token.startsWith('ExponentPushToken[')) {
-    res.status(400).json({ erro: 'token invalido' });
-    return;
-  }
-  await withDbLock(async () => {
-    const db = await readDb();
-    if (!Array.isArray(db.pushTokens)) db.pushTokens = [];
-    // Remove token antigo do mesmo usuario/plataforma e o mesmo token de outros usuarios
-    db.pushTokens = db.pushTokens.filter(
-      pt => !(pt.usuarioId === req.usuario.id && pt.plataforma === plataforma) && pt.token !== token
-    );
-    db.pushTokens.push({
-      id: createId(),
-      usuarioId: req.usuario.id,
-      token: String(token).trim(),
-      plataforma: String(plataforma || '').trim().slice(0, 20),
-      criadoEm: new Date().toISOString(),
-    });
-    await writeDb(db);
-  });
-  res.status(204).end();
 });
 
 app.post('/usuarios/recuperar-senha', async (req, res) => {
