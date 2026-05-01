@@ -1053,6 +1053,7 @@ export default function App() {
     Alert.alert('Sair', 'Deseja sair da conta?', [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Sair', style: 'destructive', onPress: () => {
+        clearDashboardCache();
         setToken('');
         setApiAuthToken(null);
         setTelaHistorico(false);
