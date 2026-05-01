@@ -192,6 +192,8 @@ const s = StyleSheet.create({
   tabBar: { flexDirection: 'row', backgroundColor: CORES.card, borderTopWidth: 1, borderTopColor: CORES.border, paddingBottom: 4 },
   tabItem: { flex: 1, alignItems: 'center', paddingVertical: 10, gap: 3 },
   tabLabel: { fontSize: 10, color: CORES.muted, fontWeight: '500' },
+  tabBadge: { position: 'absolute', top: -4, right: -6, backgroundColor: CORES.rust, borderRadius: 8, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
+  tabBadgeText: { color: '#fff', fontSize: 9, fontWeight: '700' },
   comunicadoCard: { backgroundColor: CORES.card, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: CORES.border, marginBottom: 12 },
   comunicadoHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 10 },
   comunicadoIconWrap: { width: 40, height: 40, borderRadius: 12, backgroundColor: CORES.warm, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
