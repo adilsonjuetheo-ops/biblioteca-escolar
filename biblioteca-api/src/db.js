@@ -13,6 +13,7 @@ const INITIAL_DATA = {
   desejos: [],
   comunicados: [],
   suspensoes: [],
+  pushTokens: [],
 };
 
 // ── PostgreSQL (Supabase) ─────────────────────────────────────────────────────
