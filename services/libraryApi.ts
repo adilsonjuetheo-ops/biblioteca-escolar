@@ -97,7 +97,7 @@ export async function carregarDadosBiblioteca(usuarioAtual?: Usuario | null): Pr
   if (dashboardEndpointAvailable) {
     try {
       const { data } = await http.get<DashboardData>(`/dashboard${query}`);
-      return {
+      const result: DashboardData = {
         livros: Array.isArray(data.livros) ? data.livros : [],
         emprestimos: Array.isArray(data.emprestimos) ? data.emprestimos : [],
         avaliacoes: Array.isArray(data.avaliacoes) ? data.avaliacoes : [],
@@ -106,6 +106,8 @@ export async function carregarDadosBiblioteca(usuarioAtual?: Usuario | null): Pr
         comunicados: Array.isArray(data.comunicados) ? data.comunicados.map(normalizarComunicado) : [],
         suspensoes: Array.isArray(data.suspensoes) ? data.suspensoes : [],
       };
+      if (uid) cachedDashboard = { data: result, userId: uid };
+      return result;
     } catch (e: unknown) {
       if (axios.isAxiosError(e)) {
         const status = e.response?.status;
