@@ -362,6 +362,19 @@ export default function App() {
     http.get('/health').catch(() => {}); // Aquece o Railway em segundo plano ao abrir o app
   }, []);
 
+  // Ref para acessar tela atual dentro do listener de notificação sem closure stale
+  const telaRef = useRef(tela);
+  useEffect(() => { telaRef.current = tela; }, [tela]);
+
+  useEffect(() => {
+    return configurarListenerNotificacao(() => {
+      const t = telaRef.current;
+      if (t === 'main') setAbaAtiva('avisos');
+      else if (t === 'professor') setAbaProfessor('avisos');
+      else if (t === 'bibliotecario') setAbaBiblio('avisos');
+    });
+  }, []);
+
   const buscaTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   React.useEffect(() => {
