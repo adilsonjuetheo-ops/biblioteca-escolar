@@ -95,13 +95,17 @@ export async function carregarDadosBiblioteca(usuarioAtual?: Usuario | null): Pr
         suspensoes: Array.isArray(data.suspensoes) ? data.suspensoes : [],
       };
     } catch (e: unknown) {
-      if (axios.isAxiosError(e) && e.response?.status === 404) {
-        dashboardEndpointAvailable = false;
-      } else if (axios.isAxiosError(e) && e.response) {
-        // Erro HTTP com resposta (4xx/5xx) — propaga
+      if (axios.isAxiosError(e)) {
+        const status = e.response?.status;
+        if (status === 404) {
+          dashboardEndpointAvailable = false;
+        } else if (status && status >= 500) {
+          throw e; // Erro de servidor — propaga
+        }
+        // 4xx (ex: 403 sem permissão) ou erro de rede — usa fallback individual
+      } else {
         throw e;
       }
-      // Erro de rede/cold start (sem resposta) — usa fallback individual
     }
   }
 
