@@ -725,29 +725,6 @@ export default function App() {
     }
   }
 
-  async function handleCriarComunicado() {
-    if (!novoComunicadoTitulo.trim() || !novoComunicadoMensagem.trim()) {
-      Alert.alert('Atenção', 'Título e mensagem são obrigatórios.'); return;
-    }
-    setEnviandoComunicado(true);
-    try {
-      await criarComunicado({
-        titulo: novoComunicadoTitulo.trim(),
-        mensagem: novoComunicadoMensagem.trim(),
-        destinatario: novoComunicadoDestinatario,
-      });
-      setNovoComunicadoTitulo('');
-      setNovoComunicadoMensagem('');
-      setNovoComunicadoDestinatario('todos');
-      Alert.alert('Comunicado enviado!', 'Notificação push enviada aos destinatários.');
-      await carregarDados();
-    } catch (err: unknown) {
-      Alert.alert('Erro', getApiErrorMessage(err, 'Não foi possível enviar o comunicado.'));
-    } finally {
-      setEnviandoComunicado(false);
-    }
-  }
-
   async function handleAplicarSuspensao(emp: Emprestimo, dias: number, motivo: string) {
     try {
       await aplicarSuspensao({
