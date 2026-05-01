@@ -3247,7 +3247,6 @@ export default function App() {
                 const novaAba = aba.key as AbaProfessor;
                 setAbaProfessor(novaAba);
                 setLivroSelecionado(null);
-                if (novaAba === 'reservas' || novaAba === 'ranking') carregarDados();
               }}>
               <Text style={{ fontSize: 20 }}>{aba.icon}</Text>
               <Text style={[s.tabLabel, abaProfessor === aba.key && { color: CORES.amber, fontWeight: '600' }]}>
