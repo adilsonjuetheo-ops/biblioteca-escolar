@@ -346,6 +346,10 @@ export default function App() {
     return () => clearInterval(clockTimer);
   }, []);
 
+  useEffect(() => {
+    http.get('/health').catch(() => {}); // Aquece o Railway em segundo plano ao abrir o app
+  }, []);
+
   const buscaTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   React.useEffect(() => {
