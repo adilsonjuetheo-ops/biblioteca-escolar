@@ -268,11 +268,3 @@ export async function repararEmprestimos() {
   return data;
 }
 
-export async function criarComunicado(payload: {
-  titulo: string;
-  mensagem: string;
-  destinatario: 'todos' | 'alunos' | 'professores';
-}) {
-  const { data } = await http.post<Comunicado>('/comunicados', payload);
-  return data;
-}
