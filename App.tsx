@@ -412,7 +412,7 @@ export default function App() {
 
   const generosUnicos = ['todos', ...Array.from(new Set(livros.map(l => l.genero).filter(Boolean))) as string[]];
 
-  function aplicarDadosCarregados(dados: ReturnType<typeof Object.create>, usuarioAtual: typeof usuario) {
+  function aplicarDadosCarregados(dados: { livros: Livro[]; emprestimos: Emprestimo[]; avaliacoes: Avaliacao[]; desejos: Desejo[]; usuarios: Usuario[]; comunicados: Comunicado[]; suspensoes: Suspensao[] }, usuarioAtual: Usuario | null) {
     const uid = usuarioAtual?.id;
     setLivros(Array.isArray(dados.livros) ? dados.livros : []);
     const todosEmprestimos: Emprestimo[] = Array.isArray(dados.emprestimos) ? dados.emprestimos : [];
