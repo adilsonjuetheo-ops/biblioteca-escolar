@@ -316,6 +316,10 @@ export default function App() {
   const [atualizandoBg, setAtualizandoBg] = useState(false);
   const [suspensoes, setSuspensoes] = useState<Suspensao[]>([]);
   const [comunicados, setComunicados] = useState<Comunicado[]>([]);
+  const [ordemAcervo, setOrdemAcervo] = useState<'titulo' | 'autor' | 'disponiveis' | 'popular'>('titulo');
+  const [comunicadosLidos, setComunicadosLidos] = useState<Set<string>>(new Set());
+  const [filtroEmpTurma, setFiltroEmpTurma] = useState('todas');
+  const [filtroEmpStatus, setFiltroEmpStatus] = useState('todos');
 
   const [agora, setAgora] = useState(Date.now());
 
