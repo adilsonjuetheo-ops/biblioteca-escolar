@@ -2228,6 +2228,21 @@ export default function App() {
       );
     }
 
+    const _generoFav = (() => {
+      const cnt: Record<string, number> = {};
+      historico.forEach(emp => {
+        const gen = livros.find(l => l.id === emp.livroId)?.genero;
+        if (gen) cnt[gen] = (cnt[gen] || 0) + 1;
+      });
+      return Object.entries(cnt).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+    })();
+    const _prazoMedio = (() => {
+      const dias = historico
+        .filter(e => e.dataRetirada && e.dataDevolucao)
+        .map(e => (new Date(e.dataDevolucao!).getTime() - new Date(e.dataRetirada!).getTime()) / 86400000);
+      return dias.length ? Math.round(dias.reduce((a, b) => a + b, 0) / dias.length) : null;
+    })();
+
     return (
       <ScrollView style={{ flex: 1 }}>
         <View style={s.perfilTop}>
@@ -2248,6 +2263,22 @@ export default function App() {
               </View>
             ))}
           </View>
+          {(_generoFav || _prazoMedio !== null) && (
+            <View style={[s.perfilStats, { marginTop: 10 }]}>
+              {_generoFav ? (
+                <View style={s.perfilStat}>
+                  <Text style={[s.perfilStatNum, { fontSize: 13 }]} numberOfLines={1}>{_generoFav}</Text>
+                  <Text style={s.perfilStatLabel}>Gênero fav.</Text>
+                </View>
+              ) : null}
+              {_prazoMedio !== null ? (
+                <View style={s.perfilStat}>
+                  <Text style={s.perfilStatNum}>{_prazoMedio}d</Text>
+                  <Text style={s.perfilStatLabel}>Prazo médio</Text>
+                </View>
+              ) : null}
+            </View>
+          )}
         </View>
         <View style={{ padding: 16 }}>
           {[
