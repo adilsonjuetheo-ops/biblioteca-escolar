@@ -54,7 +54,7 @@ import {
   validarQrRetirada,
   verificarSuspensao,
 } from './services/libraryApi';
-import { setApiAuthToken } from './services/http';
+import { http, setApiAuthToken } from './services/http';
 
 const CORES = {
   ink: '#1a1208',
