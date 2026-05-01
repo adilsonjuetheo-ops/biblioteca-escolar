@@ -363,14 +363,26 @@ export default function App() {
   React.useEffect(() => { setPaginaLivros(1); }, [filtroGenero, filtroDisp, ordemAcervo]);
   React.useEffect(() => { setPaginaHome(1); setPaginaHomeProfessor(1); }, [livros]);
 
+  const _popLivros = new Map<string, number>();
+  todasAvaliacoes.forEach(av => {
+    _popLivros.set(av.livroId, (_popLivros.get(av.livroId) || 0) + 1);
+  });
   const livrosFiltrados = livros.filter(livro => {
-    const textoOk = livro.titulo?.toLowerCase().includes(buscaTexto.toLowerCase()) ||
-      livro.autor?.toLowerCase().includes(buscaTexto.toLowerCase());
+    const q = buscaTexto.toLowerCase();
+    const textoOk = !q ||
+      livro.titulo?.toLowerCase().includes(q) ||
+      livro.autor?.toLowerCase().includes(q) ||
+      livro.genero?.toLowerCase().includes(q);
     const generoOk = filtroGenero === 'todos' || livro.genero === filtroGenero;
     const dispOk = filtroDisp === 'todos' ||
       (filtroDisp === 'disponivel' && livro.disponiveis > 0) ||
       (filtroDisp === 'indisponivel' && livro.disponiveis === 0);
     return textoOk && generoOk && dispOk;
+  }).sort((a, b) => {
+    if (ordemAcervo === 'autor') return (a.autor || '').localeCompare(b.autor || '', 'pt-BR');
+    if (ordemAcervo === 'disponiveis') return b.disponiveis - a.disponiveis;
+    if (ordemAcervo === 'popular') return (_popLivros.get(b.id) || 0) - (_popLivros.get(a.id) || 0);
+    return (a.titulo || '').localeCompare(b.titulo || '', 'pt-BR');
   });
 
   const LIVROS_POR_PAGINA = 20;
