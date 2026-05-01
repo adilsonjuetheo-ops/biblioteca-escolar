@@ -418,11 +418,11 @@ export default function App() {
     const todosEmprestimos: Emprestimo[] = Array.isArray(dados.emprestimos) ? dados.emprestimos : [];
     const perfil = usuarioAtual?.perfil;
     const isBiblio = !!perfil && perfil !== 'aluno' && perfil !== 'professor';
-    const ativos = todosEmprestimos.filter((e: Emprestimo) => e.status === 'reservado' || e.status === 'retirado');
-    const devolvidos = todosEmprestimos.filter((e: Emprestimo) => e.status === 'devolvido');
+    const ativos = todosEmprestimos.filter(e => e.status === 'reservado' || e.status === 'retirado');
+    const devolvidos = todosEmprestimos.filter(e => e.status === 'devolvido');
     const isProf = perfil === 'professor';
-    setEmprestimosAtivos(isBiblio ? ativos : ativos.filter((e: Emprestimo) => e.usuarioId === uid));
-    setHistorico(isBiblio ? devolvidos : devolvidos.filter((e: Emprestimo) => e.usuarioId === uid));
+    setEmprestimosAtivos(isBiblio ? ativos : ativos.filter(e => e.usuarioId === uid));
+    setHistorico(isBiblio ? devolvidos : devolvidos.filter(e => e.usuarioId === uid));
     if (isBiblio || isProf) setEmprestimosEscola(todosEmprestimos);
     setTodasAvaliacoes(Array.isArray(dados.avaliacoes) ? dados.avaliacoes : []);
     setDesejos(Array.isArray(dados.desejos) ? dados.desejos : []);
