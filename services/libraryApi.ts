@@ -45,6 +45,18 @@ type LivroPayload = {
 
 let dashboardEndpointAvailable = true;
 
+type CachedDashboard = { data: DashboardData; userId: string };
+let cachedDashboard: CachedDashboard | null = null;
+
+export function getCachedDashboard(userId: string): DashboardData | null {
+  if (cachedDashboard?.userId === userId) return cachedDashboard.data;
+  return null;
+}
+
+export function clearDashboardCache(): void {
+  cachedDashboard = null;
+}
+
 export function getApiErrorMessage(err: unknown, fallback: string): string {
   if (axios.isAxiosError<ApiErro>(err)) {
     return err.response?.data?.erro || fallback;
