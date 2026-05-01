@@ -508,7 +508,6 @@ export default function App() {
         setTela('bibliotecario'); setAbaBiblio('dashboard');
       }
       await carregarDados(usuarioLogado);
-      registrarPushToken(); // Fire and forget — nunca bloqueia o login
     } catch (err: unknown) {
       setErro(getApiErrorMessage(err, 'E-mail ou senha incorretos'));
     } finally {
