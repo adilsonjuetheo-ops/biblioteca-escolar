@@ -412,31 +412,58 @@ export default function App() {
 
   const generosUnicos = ['todos', ...Array.from(new Set(livros.map(l => l.genero).filter(Boolean))) as string[]];
 
-  async function carregarDados(usuarioAtual = usuario) {
-    setCarregando(true);
-    setErroConexao(false);
+  function aplicarDadosCarregados(dados: ReturnType<typeof Object.create>, usuarioAtual: typeof usuario) {
+    const uid = usuarioAtual?.id;
+    setLivros(Array.isArray(dados.livros) ? dados.livros : []);
+    const todosEmprestimos: Emprestimo[] = Array.isArray(dados.emprestimos) ? dados.emprestimos : [];
+    const perfil = usuarioAtual?.perfil;
+    const isBiblio = !!perfil && perfil !== 'aluno' && perfil !== 'professor';
+    const ativos = todosEmprestimos.filter((e: Emprestimo) => e.status === 'reservado' || e.status === 'retirado');
+    const devolvidos = todosEmprestimos.filter((e: Emprestimo) => e.status === 'devolvido');
+    const isProf = perfil === 'professor';
+    setEmprestimosAtivos(isBiblio ? ativos : ativos.filter((e: Emprestimo) => e.usuarioId === uid));
+    setHistorico(isBiblio ? devolvidos : devolvidos.filter((e: Emprestimo) => e.usuarioId === uid));
+    if (isBiblio || isProf) setEmprestimosEscola(todosEmprestimos);
+    setTodasAvaliacoes(Array.isArray(dados.avaliacoes) ? dados.avaliacoes : []);
+    setDesejos(Array.isArray(dados.desejos) ? dados.desejos : []);
+    setUsuariosAdmin(Array.isArray(dados.usuarios) ? dados.usuarios : []);
+    setComunicados(Array.isArray(dados.comunicados) ? dados.comunicados : []);
+    setSuspensoes(Array.isArray(dados.suspensoes) ? dados.suspensoes : []);
+  }
+
+  async function carregarDados(usuarioAtual = usuario, opts: { pull?: boolean } = {}) {
+    const { pull = false } = opts;
+    const uid = usuarioAtual?.id;
+    const cached = uid ? getCachedDashboard(uid) : null;
+
+    if (cached && !pull) {
+      // Mostra cache imediatamente e atualiza em segundo plano
+      aplicarDadosCarregados(cached, usuarioAtual);
+      setErroConexao(false);
+      setAtualizandoBg(true);
+      try {
+        const fresh = await carregarDadosBiblioteca(usuarioAtual);
+        aplicarDadosCarregados(fresh, usuarioAtual);
+      } catch {
+        // Mantém os dados do cache visíveis
+      } finally {
+        setAtualizandoBg(false);
+      }
+      return;
+    }
+
+    if (pull) setRefreshing(true);
+    else { setCarregando(true); setErroConexao(false); }
+
     try {
-      const uid = usuarioAtual?.id;
       const dados = await carregarDadosBiblioteca(usuarioAtual);
-      setLivros(Array.isArray(dados.livros) ? dados.livros : []);
-      const todosEmprestimos: Emprestimo[] = Array.isArray(dados.emprestimos) ? dados.emprestimos : [];
-      const perfil = usuarioAtual?.perfil;
-      const isBiblio = !!perfil && perfil !== 'aluno' && perfil !== 'professor';
-      const ativos = todosEmprestimos.filter(e => e.status === 'reservado' || e.status === 'retirado');
-      const devolvidos = todosEmprestimos.filter(e => e.status === 'devolvido');
-      const isProf = perfil === 'professor';
-      setEmprestimosAtivos(isBiblio ? ativos : ativos.filter(e => e.usuarioId === uid));
-      setHistorico(isBiblio ? devolvidos : devolvidos.filter(e => e.usuarioId === uid));
-      if (isBiblio || isProf) setEmprestimosEscola(todosEmprestimos);
-      setTodasAvaliacoes(Array.isArray(dados.avaliacoes) ? dados.avaliacoes : []);
-      setDesejos(Array.isArray(dados.desejos) ? dados.desejos : []);
-      setUsuariosAdmin(Array.isArray(dados.usuarios) ? dados.usuarios : []);
-      setComunicados(Array.isArray(dados.comunicados) ? dados.comunicados : []);
-      setSuspensoes(Array.isArray(dados.suspensoes) ? dados.suspensoes : []);
+      aplicarDadosCarregados(dados, usuarioAtual);
+      setErroConexao(false);
     } catch {
-      setErroConexao(true);
+      if (!pull) setErroConexao(true);
     } finally {
       setCarregando(false);
+      setRefreshing(false);
     }
   }
 
