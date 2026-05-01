@@ -2616,6 +2616,57 @@ export default function App() {
         </View>
         <View style={{ padding: 16 }}>
 
+          {/* ── ENVIAR COMUNICADO / PUSH ── */}
+          <Text style={s.sectionLabel}>ENVIAR COMUNICADO</Text>
+          <View style={s.qrValidationBox}>
+            <Text style={[s.loanAuthor, { textAlign: 'center', marginBottom: 12 }]}>
+              🔔 O comunicado é salvo e uma notificação push é enviada automaticamente
+            </Text>
+            <Text style={s.label}>Destinatários</Text>
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+              {([
+                { key: 'todos', label: '📢 Todos' },
+                { key: 'alunos', label: '🎒 Alunos' },
+                { key: 'professores', label: '📖 Professores' },
+              ] as const).map(d => (
+                <TouchableOpacity key={d.key}
+                  style={[s.filtroBtn, novoComunicadoDestinatario === d.key && s.filtroBtnAtivo, { flex: 1 }]}
+                  onPress={() => setNovoComunicadoDestinatario(d.key)}>
+                  <Text style={[s.filtroText, novoComunicadoDestinatario === d.key && s.filtroTextAtivo, { textAlign: 'center' }]}>
+                    {d.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={s.label}>Título *</Text>
+            <TextInput
+              style={[s.input, { marginBottom: 10 }]}
+              placeholder="Ex: Semana da Leitura"
+              placeholderTextColor={CORES.muted}
+              value={novoComunicadoTitulo}
+              onChangeText={setNovoComunicadoTitulo}
+              maxLength={200}
+            />
+            <Text style={s.label}>Mensagem *</Text>
+            <TextInput
+              style={[s.input, { marginBottom: 12, minHeight: 80, textAlignVertical: 'top' }]}
+              placeholder="Escreva o comunicado..."
+              placeholderTextColor={CORES.muted}
+              value={novoComunicadoMensagem}
+              onChangeText={setNovoComunicadoMensagem}
+              multiline
+              maxLength={2000}
+            />
+            <TouchableOpacity
+              style={[s.btnPrimary, { opacity: enviandoComunicado ? 0.7 : 1 }]}
+              onPress={handleCriarComunicado}
+              disabled={enviandoComunicado}>
+              {enviandoComunicado
+                ? <ActivityIndicator color={CORES.ink} />
+                : <Text style={s.btnPrimaryText}>🔔 Enviar comunicado</Text>}
+            </TouchableOpacity>
+          </View>
+
           {/* ── CADASTRO POR FOTO ── */}
           <Text style={s.sectionLabel}>CADASTRAR LIVRO POR FOTO</Text>
           <View style={s.qrValidationBox}>
