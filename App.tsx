@@ -44,6 +44,7 @@ import {
   listarEmprestimos,
   login,
   redefinirSenha,
+  criarComunicado,
   removerDesejo,
   removerLivro,
   renovarEmprestimo,
@@ -55,6 +56,7 @@ import {
   verificarSuspensao,
 } from './services/libraryApi';
 import { http, setApiAuthToken } from './services/http';
+import { registrarPushToken, configurarListenerNotificacao } from './services/pushNotifications';
 
 const CORES = {
   ink: '#1a1208',
