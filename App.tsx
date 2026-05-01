@@ -3409,22 +3409,33 @@ export default function App() {
         {abaAtiva === 'avisos' && renderNotificacoes()}
       </View>
       <View style={s.tabBar}>
-        {abas.map(aba => (
-          <TouchableOpacity key={aba.key} style={s.tabItem}
-            onPress={() => {
-              setAbaAtiva(aba.key as AbaUsuario);
-              setLivroSelecionado(null);
-              setTelaListaDesejos(false);
-              setTelaQrRetirada(false);
-              setTelaHistorico(false);
-              setTelaComunicadosPerfil(false);
-            }}>
-            <Text style={{ fontSize: 20 }}>{aba.icon}</Text>
-            <Text style={[s.tabLabel, abaAtiva === aba.key && { color: CORES.amber, fontWeight: '600' }]}>
-              {aba.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        {abas.map(aba => {
+          const naoLidos = comunicados.filter(c => !comunicadosLidos.has(c.id)).length;
+          return (
+            <TouchableOpacity key={aba.key} style={s.tabItem}
+              onPress={() => {
+                setAbaAtiva(aba.key as AbaUsuario);
+                setLivroSelecionado(null);
+                setTelaListaDesejos(false);
+                setTelaQrRetirada(false);
+                setTelaHistorico(false);
+                setTelaComunicadosPerfil(false);
+                if (aba.key === 'avisos') setComunicadosLidos(new Set(comunicados.map(c => c.id)));
+              }}>
+              <View style={{ position: 'relative' }}>
+                <Text style={{ fontSize: 20 }}>{aba.icon}</Text>
+                {aba.key === 'avisos' && naoLidos > 0 && (
+                  <View style={s.tabBadge}>
+                    <Text style={s.tabBadgeText}>{naoLidos > 9 ? '9+' : naoLidos}</Text>
+                  </View>
+                )}
+              </View>
+              <Text style={[s.tabLabel, abaAtiva === aba.key && { color: CORES.amber, fontWeight: '600' }]}>
+                {aba.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
     </SafeAreaView>
   );
