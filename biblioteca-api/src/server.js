@@ -1230,31 +1230,27 @@ app.get('/comunicados', verifyToken, async (_, res) => {
 });
 
 app.post('/comunicados', verifyToken, requirePerfil('bibliotecario', 'professor'), async (req, res) => {
-  const { titulo, mensagem, tipo = 'info', destinatario = 'todos' } = req.body || {};
+  const { titulo, mensagem, tipo = 'info' } = req.body || {};
   if (!titulo || !mensagem) {
     res.status(400).json({ erro: 'titulo e mensagem sao obrigatorios.' });
     return;
   }
-  const destValido = ['todos', 'alunos', 'professores'].includes(destinatario) ? destinatario : 'todos';
-  const { resultado, usuarios, pushTokens } = await withDbLock(async () => {
+  const resultado = await withDbLock(async () => {
     const db = await readDb();
     const novo = {
       id: createId(),
       titulo: String(titulo).trim().slice(0, 200),
       mensagem: String(mensagem).trim().slice(0, 2000),
       tipo: String(tipo).trim().slice(0, 50),
-      destinatario: destValido,
       autorId: req.usuario.id,
       autorNome: db.usuarios.find((u) => u.id === req.usuario.id)?.nome || '',
       criadoEm: new Date().toISOString(),
     };
     db.comunicados.push(novo);
     await writeDb(db);
-    return { resultado: novo, usuarios: db.usuarios, pushTokens: db.pushTokens || [] };
+    return novo;
   });
   res.status(201).json(resultado);
-  // Envia push em background sem bloquear a resposta
-  enviarPushNotificacao(usuarios, pushTokens, destValido, resultado.titulo, resultado.mensagem);
 });
 
 app.delete('/comunicados/:id', verifyToken, requirePerfil('bibliotecario'), async (req, res) => {
