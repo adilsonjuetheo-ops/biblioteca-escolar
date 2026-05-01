@@ -31,6 +31,8 @@ import {
   aplicarSuspensao,
   cadastrarUsuario,
   carregarDadosBiblioteca,
+  clearDashboardCache,
+  getCachedDashboard,
   criarLivro,
   atualizarLivro,
   devolverEmprestimo,
