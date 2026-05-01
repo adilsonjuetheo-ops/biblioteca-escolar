@@ -44,7 +44,6 @@ import {
   listarEmprestimos,
   login,
   redefinirSenha,
-  criarComunicado,
   removerDesejo,
   removerLivro,
   renovarEmprestimo,
