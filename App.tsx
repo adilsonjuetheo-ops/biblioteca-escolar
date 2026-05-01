@@ -360,7 +360,7 @@ export default function App() {
     setApiAuthToken(token);
   }, [token]);
 
-  React.useEffect(() => { setPaginaLivros(1); }, [filtroGenero, filtroDisp]);
+  React.useEffect(() => { setPaginaLivros(1); }, [filtroGenero, filtroDisp, ordemAcervo]);
   React.useEffect(() => { setPaginaHome(1); setPaginaHomeProfessor(1); }, [livros]);
 
   const livrosFiltrados = livros.filter(livro => {
