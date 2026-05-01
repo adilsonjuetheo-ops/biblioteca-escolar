@@ -267,3 +267,12 @@ export async function repararEmprestimos() {
   const { data } = await http.post<{ mensagem: string }>(API_ENDPOINTS.repararEmprestimos, {});
   return data;
 }
+
+export async function criarComunicado(payload: {
+  titulo: string;
+  mensagem: string;
+  destinatario: 'todos' | 'alunos' | 'professores';
+}) {
+  const { data } = await http.post<Comunicado>('/comunicados', payload);
+  return data;
+}
