@@ -1718,7 +1718,7 @@ export default function App() {
             </View>
           </ScrollView>
           <Text style={s.sectionLabel}>GÊNERO</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
             <View style={{ flexDirection: 'row', gap: 8 }}>
               {generosUnicos.map(g => (
                 <TouchableOpacity key={g}
@@ -1727,6 +1727,23 @@ export default function App() {
                   <Text style={[s.filtroText, filtroGenero === g && s.filtroTextAtivo]}>
                     {g === 'todos' ? 'Todos' : g}
                   </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+          <Text style={s.sectionLabel}>ORDENAÇÃO</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {([
+                { key: 'titulo', label: 'A–Z Título' },
+                { key: 'autor', label: 'A–Z Autor' },
+                { key: 'disponiveis', label: '✓ Disponíveis' },
+                { key: 'popular', label: '⭐ Populares' },
+              ] as const).map(o => (
+                <TouchableOpacity key={o.key}
+                  style={[s.filtroBtn, ordemAcervo === o.key && s.filtroBtnAtivo]}
+                  onPress={() => setOrdemAcervo(o.key)}>
+                  <Text style={[s.filtroText, ordemAcervo === o.key && s.filtroTextAtivo]}>{o.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
