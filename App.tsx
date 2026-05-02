@@ -76,6 +76,14 @@ const DOMINIO_PROFESSOR = '@educacao.mg.gov.br';
 const ESCOLA = 'E. E. Cel. Jose Venancio de Souza';
 const BIBLIOTECA = 'Biblioteca Marlene de Souza Queiroz';
 
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
+
 function calcularProgresso(emp: Emprestimo): number {
   const inicio = emp.dataRetirada ?? emp.dataReserva;
   const fim = emp.dataPrevistaDevolucao;
