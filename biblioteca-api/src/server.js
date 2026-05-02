@@ -1291,9 +1291,11 @@ app.post('/comunicados', verifyToken, requirePerfil('bibliotecario', 'professor'
     };
     db.comunicados.push(novo);
     await writeDb(db);
-    return novo;
+    return { novo, tokens: (db.pushTokens || []).map((pt) => pt.token) };
   });
-  res.status(201).json(resultado);
+  // dispara notificações fora do lock para não bloquear escritas
+  sendPushNotifications(resultado.tokens, resultado.novo.titulo, resultado.novo.mensagem);
+  res.status(201).json(resultado.novo);
 });
 
 app.delete('/comunicados/:id', verifyToken, requirePerfil('bibliotecario'), async (req, res) => {
