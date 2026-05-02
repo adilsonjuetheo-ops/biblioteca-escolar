@@ -80,6 +80,7 @@ function normalizeData(data) {
     desejos: Array.isArray(data.desejos) ? data.desejos : [],
     comunicados: Array.isArray(data.comunicados) ? data.comunicados : [],
     suspensoes: Array.isArray(data.suspensoes) ? data.suspensoes : [],
+    pushTokens: Array.isArray(data.pushTokens) ? data.pushTokens : [],
   };
 }
 
