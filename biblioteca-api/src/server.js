@@ -406,6 +406,27 @@ app.delete('/usuarios/me', verifyToken, async (req, res) => {
     db.emprestimos = (db.emprestimos || []).filter((e) => e.usuarioId !== id);
     db.desejos = (db.desejos || []).filter((d) => d.usuarioId !== id);
     db.avaliacoes = (db.avaliacoes || []).filter((a) => a.usuarioId !== id);
+    db.pushTokens = (db.pushTokens || []).filter((pt) => pt.userId !== id);
+    await writeDb(db);
+  });
+  res.json({ ok: true });
+});
+
+app.post('/usuarios/push-token', verifyToken, async (req, res) => {
+  const { token } = req.body || {};
+  if (!token || typeof token !== 'string' || token.length > 500) {
+    res.status(400).json({ erro: 'Token inválido.' });
+    return;
+  }
+  await withDbLock(async () => {
+    const db = await readDb();
+    const idx = db.pushTokens.findIndex((pt) => pt.userId === req.usuario.id);
+    const entry = { userId: req.usuario.id, token, atualizadoEm: new Date().toISOString() };
+    if (idx >= 0) {
+      db.pushTokens[idx] = entry;
+    } else {
+      db.pushTokens.push(entry);
+    }
     await writeDb(db);
   });
   res.json({ ok: true });
