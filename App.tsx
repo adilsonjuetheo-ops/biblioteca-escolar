@@ -376,6 +376,27 @@ export default function App() {
   React.useEffect(() => { setPaginaLivros(1); }, [filtroGenero, filtroDisp, ordemAcervo]);
   React.useEffect(() => { setPaginaHome(1); setPaginaHomeProfessor(1); }, [livros]);
 
+  useEffect(() => {
+    if (!usuario) return;
+    if (!Device.isDevice) return; // emulador não suporta push
+    async function registrar() {
+      const { status } = await Notifications.getPermissionsAsync();
+      const statusFinal = status !== 'granted'
+        ? (await Notifications.requestPermissionsAsync()).status
+        : status;
+      if (statusFinal !== 'granted') return;
+      try {
+        const { data: expoPushToken } = await Notifications.getExpoPushTokenAsync({
+          projectId: '4e9f49b6-7367-4dc1-99a6-0d0431d1884e',
+        });
+        await registrarPushToken(expoPushToken);
+      } catch {
+        // falha silenciosa — push não é crítico
+      }
+    }
+    registrar();
+  }, [usuario?.id]);
+
   const _popLivros = new Map<string, number>();
   todasAvaliacoes.forEach(av => {
     _popLivros.set(av.livroId, (_popLivros.get(av.livroId) || 0) + 1);
