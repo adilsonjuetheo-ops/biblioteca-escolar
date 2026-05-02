@@ -194,6 +194,28 @@ function requirePerfil(...perfis) {
   };
 }
 
+// ── Push Notifications (Expo Push API) ───────────────────────────────────────
+
+async function sendPushNotifications(tokens, title, body, data = {}) {
+  if (!tokens || tokens.length === 0) return;
+  const messages = tokens.map((token) => ({
+    to: token,
+    sound: 'default',
+    title,
+    body,
+    data,
+  }));
+  try {
+    await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(messages),
+    });
+  } catch (e) {
+    console.error('[Push] Erro ao enviar notificações:', e.message);
+  }
+}
+
 // ── CORS e body parser ────────────────────────────────────────────────────────
 
 const allowedOrigins = parseAllowedOrigins();
