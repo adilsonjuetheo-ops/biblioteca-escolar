@@ -81,6 +81,10 @@ export function normalizarComunicado(item: Comunicado): Comunicado {
   };
 }
 
+export async function registrarPushToken(token: string): Promise<void> {
+  await http.post('/usuarios/push-token', { token });
+}
+
 async function safeGet<T>(url: string, fallback: T): Promise<T> {
   try {
     const { data } = await http.get<T>(url);
