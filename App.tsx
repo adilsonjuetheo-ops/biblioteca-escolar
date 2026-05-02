@@ -49,6 +49,7 @@ import {
   removerDesejo,
   removerLivro,
   renovarEmprestimo,
+  registrarPushToken,
   repararEmprestimos,
   reservarLivro,
   retirarEmprestimo,
