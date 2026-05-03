@@ -1278,8 +1278,8 @@ app.post('/admin/reparar-emprestimos', verifyToken, requirePerfil('bibliotecario
 // ── Comunicados ───────────────────────────────────────────────────────────────
 
 app.get('/comunicados', verifyToken, async (_, res) => {
-  const db = await readDb();
-  res.json(db.comunicados || []);
+  const slices = await readDbSlices(['comunicados']);
+  res.json(slices.comunicados || []);
 });
 
 app.post('/comunicados', verifyToken, requirePerfil('bibliotecario', 'professor'), async (req, res) => {
