@@ -694,6 +694,16 @@ app.get('/emprestimos', verifyToken, async (req, res) => {
   }
 });
 
+app.get('/emprestimos/:id/status', verifyToken, async (req, res) => {
+  const slices = await readDbSlices(['emprestimos']);
+  const emp = (slices.emprestimos || []).find((e) => e.id === req.params.id);
+  if (!emp) { res.status(404).json({ erro: 'Empréstimo não encontrado.' }); return; }
+  if (req.usuario.id !== emp.usuarioId && !isAdmin(req.usuario.perfil) && req.usuario.perfil !== 'professor') {
+    res.status(403).json({ erro: 'Acesso negado.' }); return;
+  }
+  res.json({ status: emp.status });
+});
+
 // Criar reserva: aluno/professor podem reservar apenas para si mesmos
 app.post('/emprestimos', verifyToken, async (req, res) => {
   const { livroId } = req.body || {};
