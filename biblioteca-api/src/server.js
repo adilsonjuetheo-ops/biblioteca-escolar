@@ -516,8 +516,8 @@ app.post('/usuarios/redefinir-senha', async (req, res) => {
   }
 
   const resultado = await withDbLock(async () => {
-    const slices = await readDbSlices(['usuarios']);
-    const usuario = (slices.usuarios || []).find((u) => u.email === emailNormalizado);
+    const db = await readDb();
+    const usuario = db.usuarios.find((u) => u.email === emailNormalizado);
     if (!usuario) {
       return { status: 400, erro: 'Codigo invalido ou expirado.' };
     }
