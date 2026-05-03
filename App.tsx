@@ -651,16 +651,14 @@ export default function App() {
       setEmprestimoQrAtual(emp);
       setDadosQrRetirada(data);
       setTelaQrRetirada(true);
-      await carregarDados();
 
       // Cancela qualquer polling anterior
       cancelarPollingQr();
 
       intervaloQrRef.current = setInterval(async () => {
         try {
-          const empAtualizado = await listarEmprestimos();
-          const empEncontrado = empAtualizado.find((e: Emprestimo) => e.id === emp.id);
-          if (empEncontrado?.status === 'retirado') {
+          const { data: statusData } = await http.get<{ status: string }>(`/emprestimos/${emp.id}/status`);
+          if (statusData.status === 'retirado') {
             cancelarPollingQr();
             setTelaQrRetirada(false);
             setEmprestimoQrAtual(null);
