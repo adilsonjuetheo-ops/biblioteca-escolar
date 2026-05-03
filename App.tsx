@@ -387,7 +387,7 @@ export default function App() {
       if (statusFinal !== 'granted') return;
       try {
         const { data: expoPushToken } = await Notifications.getExpoPushTokenAsync({
-          projectId: '4e9f49b6-7367-4dc1-99a6-0d0431d1884e',
+          projectId: '4e9f49b6-7367-4dc1-99a6-0d0431d1874e',
         });
         await registrarPushToken(expoPushToken);
       } catch {
