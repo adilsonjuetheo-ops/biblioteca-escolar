@@ -685,12 +685,12 @@ app.get('/usuarios', verifyToken, requirePerfil('bibliotecario', 'professor'), a
 
 // Listar: bibliotecario/professor veem todos; aluno vê só os seus
 app.get('/emprestimos', verifyToken, async (req, res) => {
-  const db = await readDb();
+  const slices = await readDbSlices(['emprestimos']);
   const { perfil, id } = req.usuario;
   if (isAdmin(perfil) || perfil === 'professor') {
-    res.json(db.emprestimos);
+    res.json(slices.emprestimos || []);
   } else {
-    res.json(db.emprestimos.filter((e) => e.usuarioId === id));
+    res.json((slices.emprestimos || []).filter((e) => e.usuarioId === id));
   }
 });
 
