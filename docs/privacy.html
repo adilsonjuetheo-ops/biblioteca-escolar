@@ -192,7 +192,27 @@
   </section>
 
   <section>
-    <h2>4. Como os dados são armazenados</h2>
+    <h2>4. Notificações push</h2>
+    <p>
+      O aplicativo pode solicitar permissão para enviar notificações ao seu dispositivo.
+      Essa permissão é <strong>opcional</strong> — recusá-la não impede o uso de nenhuma
+      funcionalidade do app.
+    </p>
+    <p>
+      Caso você conceda a permissão, um <strong>token de notificação</strong> (identificador
+      anônimo gerado pelo serviço Expo) é armazenado associado à sua conta. Ele é usado
+      exclusivamente para enviar comunicados e avisos da biblioteca (como novas aquisições
+      ou prazos de devolução). Não é usado para publicidade ou rastreamento.
+    </p>
+    <p>
+      Você pode revogar a permissão a qualquer momento nas configurações do seu dispositivo
+      (<em>Ajustes → Biblioteca BMSQ → Notificações</em>). O token também é excluído
+      automaticamente quando você exclui sua conta.
+    </p>
+  </section>
+
+  <section>
+    <h2>5. Como os dados são armazenados</h2>
     <p>
       Todos os dados são armazenados de forma segura em servidores do
       <strong>Supabase</strong> (PostgreSQL), com conexão criptografada via SSL/TLS.
