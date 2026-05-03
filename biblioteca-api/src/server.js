@@ -555,8 +555,8 @@ app.post('/usuarios/redefinir-senha', async (req, res) => {
 
 // Catálogo: qualquer usuário autenticado pode visualizar
 app.get('/livros', verifyToken, async (_, res) => {
-  const db = await readDb();
-  res.json(db.livros);
+  const slices = await readDbSlices(['livros']);
+  res.json(slices.livros || []);
 });
 
 // Adicionar livro: somente bibliotecario
