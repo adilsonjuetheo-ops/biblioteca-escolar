@@ -1324,14 +1324,14 @@ app.delete('/comunicados/:id', verifyToken, requirePerfil('bibliotecario'), asyn
 // ── Suspensões ────────────────────────────────────────────────────────────────
 
 app.get('/suspensoes', verifyToken, requirePerfil('bibliotecario', 'professor'), async (_, res) => {
-  const db = await readDb();
-  res.json(db.suspensoes || []);
+  const slices = await readDbSlices(['suspensoes']);
+  res.json(slices.suspensoes || []);
 });
 
 app.get('/suspensoes/verificar/:usuarioId', verifyToken, async (req, res) => {
-  const db = await readDb();
+  const slices = await readDbSlices(['suspensoes']);
   const agora = new Date();
-  const suspensaoAtiva = (db.suspensoes || []).find(
+  const suspensaoAtiva = (slices.suspensoes || []).find(
     (s) => s.usuarioId === req.params.usuarioId && new Date(s.expiraEm) > agora
   );
   if (suspensaoAtiva) {
