@@ -15,7 +15,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "br.com.adilsondev.bibliotecabmsq",
-      "buildNumber": "6",
+      "buildNumber": "7",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "A câmera é utilizada para fotografar capas de livros, permitindo que a IA identifique automaticamente o título, autor e demais dados da obra.",
