@@ -968,8 +968,8 @@ app.patch('/emprestimos/:id/devolver', verifyToken, requirePerfil('bibliotecario
 // ── Rotas de avaliações ───────────────────────────────────────────────────────
 
 app.get('/avaliacoes', verifyToken, async (_, res) => {
-  const db = await readDb();
-  res.json(db.avaliacoes || []);
+  const slices = await readDbSlices(['avaliacoes']);
+  res.json(slices.avaliacoes || []);
 });
 
 app.post('/avaliacoes', verifyToken, async (req, res) => {
