@@ -477,7 +477,11 @@ export default function App() {
     setTodasAvaliacoes(Array.isArray(dados.avaliacoes) ? dados.avaliacoes : []);
     setDesejos(Array.isArray(dados.desejos) ? dados.desejos : []);
     setUsuariosAdmin(Array.isArray(dados.usuarios) ? dados.usuarios : []);
-    setComunicados(Array.isArray(dados.comunicados) ? dados.comunicados : []);
+    const todosComunicados = Array.isArray(dados.comunicados) ? dados.comunicados : [];
+    setComunicados(isBiblio ? todosComunicados : todosComunicados.filter(c =>
+      !c.destinatario || c.destinatario === 'todos' ||
+      c.destinatario === (perfil === 'aluno' ? 'alunos' : 'professores')
+    ));
     setSuspensoes(Array.isArray(dados.suspensoes) ? dados.suspensoes : []);
   }
 
