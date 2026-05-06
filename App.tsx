@@ -2516,6 +2516,13 @@ export default function App() {
                               </View>
                             )}
                           </View>
+                          {emp.status === 'retirado' && !emp.renovado && (
+                            <TouchableOpacity
+                              style={[s.btnAmber, { backgroundColor: CORES.sage, paddingHorizontal: 8, marginBottom: 4 }]}
+                              onPress={() => handleRenovar(emp)}>
+                              <Text style={s.btnAmberText}>🔄 Renovar</Text>
+                            </TouchableOpacity>
+                          )}
                           <TouchableOpacity style={s.btnAmber} onPress={() => handleDevolucao(emp)}>
                             <Text style={s.btnAmberText}>Devolver</Text>
                           </TouchableOpacity>
