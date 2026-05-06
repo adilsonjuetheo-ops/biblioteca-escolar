@@ -389,6 +389,20 @@ app.post('/usuarios/login', async (req, res) => {
 
   limparFalhasLogin(ip);
 
+  // Auto-corrige empréstimos cujo usuarioId original não existe mais (conta recriada)
+  try {
+    const idsExistentes = new Set(db.usuarios.map((u) => u.id));
+    const emprestimosOrfaos = db.emprestimos.filter(
+      (e) => e.usuarioNome === usuario.nome && e.usuarioId !== usuario.id && !idsExistentes.has(e.usuarioId)
+    );
+    if (emprestimosOrfaos.length > 0) {
+      emprestimosOrfaos.forEach((e) => { e.usuarioId = usuario.id; });
+      await writeDb(db);
+    }
+  } catch {
+    // falha silenciosa — não bloqueia o login
+  }
+
   const token = jwt.sign(
     { id: usuario.id, email: usuario.email, perfil: usuario.perfil },
     JWT_SECRET,
