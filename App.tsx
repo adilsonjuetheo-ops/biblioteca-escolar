@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, Alert, ScrollView,
@@ -80,6 +80,8 @@ const BIBLIOTECA = 'Biblioteca Marlene de Souza Queiroz';
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
   }),
@@ -345,7 +347,7 @@ export default function App() {
   const [salvandoScan, setSalvandoScan] = useState(false);
   const [reparando, setReparando] = useState(false);
 
-  const saudacaoPorHorario = (() => {
+  const saudacaoPorHorario = useMemo(() => {
     const hora = Number(
       new Intl.DateTimeFormat('pt-BR', {
         hour: '2-digit',
@@ -356,15 +358,19 @@ export default function App() {
     if (hora < 12) return 'Bom dia';
     if (hora < 18) return 'Boa tarde';
     return 'Boa noite';
-  })();
+  }, [agora]);
 
   useEffect(() => {
     const clockTimer = setInterval(() => setAgora(Date.now()), 60000);
     return () => clearInterval(clockTimer);
   }, []);
 
+  const [servidorPronto, setServidorPronto] = useState<boolean | null>(null);
   useEffect(() => {
-    http.get('/health').catch(() => {}); // Aquece o Railway em segundo plano ao abrir o app
+    setServidorPronto(false);
+    http.get('/health')
+      .then(() => setServidorPronto(true))
+      .catch(() => setServidorPronto(true)); // mesmo com erro, não bloqueia
   }, []);
 
   const buscaTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -397,59 +403,68 @@ export default function App() {
     registrar();
   }, [usuario?.id]);
 
-  const _popLivros = new Map<string, number>();
-  todasAvaliacoes.forEach(av => {
-    _popLivros.set(av.livroId, (_popLivros.get(av.livroId) || 0) + 1);
-  });
-  const livrosFiltrados = livros.filter(livro => {
+  const _popLivros = useMemo(() => {
+    const map = new Map<string, number>();
+    todasAvaliacoes.forEach(av => {
+      map.set(av.livroId, (map.get(av.livroId) || 0) + 1);
+    });
+    return map;
+  }, [todasAvaliacoes]);
+
+  const livrosFiltrados = useMemo(() => {
     const q = buscaTexto.toLowerCase();
-    const textoOk = !q ||
-      livro.titulo?.toLowerCase().includes(q) ||
-      livro.autor?.toLowerCase().includes(q) ||
-      livro.genero?.toLowerCase().includes(q);
-    const generoOk = filtroGenero === 'todos' || livro.genero === filtroGenero;
-    const dispOk = filtroDisp === 'todos' ||
-      (filtroDisp === 'disponivel' && livro.disponiveis > 0) ||
-      (filtroDisp === 'indisponivel' && livro.disponiveis === 0);
-    return textoOk && generoOk && dispOk;
-  }).sort((a, b) => {
-    if (ordemAcervo === 'autor') return (a.autor || '').localeCompare(b.autor || '', 'pt-BR');
-    if (ordemAcervo === 'disponiveis') return b.disponiveis - a.disponiveis;
-    if (ordemAcervo === 'popular') return (_popLivros.get(b.id) || 0) - (_popLivros.get(a.id) || 0);
-    return (a.titulo || '').localeCompare(b.titulo || '', 'pt-BR');
-  });
+    return livros.filter(livro => {
+      const textoOk = !q ||
+        livro.titulo?.toLowerCase().includes(q) ||
+        livro.autor?.toLowerCase().includes(q) ||
+        livro.genero?.toLowerCase().includes(q);
+      const generoOk = filtroGenero === 'todos' || livro.genero === filtroGenero;
+      const dispOk = filtroDisp === 'todos' ||
+        (filtroDisp === 'disponivel' && livro.disponiveis > 0) ||
+        (filtroDisp === 'indisponivel' && livro.disponiveis === 0);
+      return textoOk && generoOk && dispOk;
+    }).sort((a, b) => {
+      if (ordemAcervo === 'autor') return (a.autor || '').localeCompare(b.autor || '', 'pt-BR');
+      if (ordemAcervo === 'disponiveis') return b.disponiveis - a.disponiveis;
+      if (ordemAcervo === 'popular') return (_popLivros.get(b.id) || 0) - (_popLivros.get(a.id) || 0);
+      return (a.titulo || '').localeCompare(b.titulo || '', 'pt-BR');
+    });
+  }, [livros, buscaTexto, filtroGenero, filtroDisp, ordemAcervo, _popLivros]);
+
+  const generosUnicos = useMemo(() =>
+    ['todos', ...Array.from(new Set(livros.map(l => l.genero).filter(Boolean))) as string[]],
+  [livros]);
 
   const LIVROS_POR_PAGINA = 20;
-  const totalPaginasLivros = Math.max(1, Math.ceil(livrosFiltrados.length / LIVROS_POR_PAGINA));
-  const livrosPaginados = livrosFiltrados.slice(
-    (paginaLivros - 1) * LIVROS_POR_PAGINA,
-    paginaLivros * LIVROS_POR_PAGINA,
-  );
-  const totalPaginasHome = Math.max(1, Math.ceil(livros.length / LIVROS_POR_PAGINA));
-  const livrosPaginadosHome = livros.slice(
-    (paginaHome - 1) * LIVROS_POR_PAGINA,
-    paginaHome * LIVROS_POR_PAGINA,
-  );
-  const totalPaginasHomeProfessor = Math.max(1, Math.ceil(livros.length / LIVROS_POR_PAGINA));
-  const livrosPaginadosHomeProfessor = livros.slice(
-    (paginaHomeProfessor - 1) * LIVROS_POR_PAGINA,
-    paginaHomeProfessor * LIVROS_POR_PAGINA,
-  );
-  const totalPaginasGestao = Math.max(1, Math.ceil(livros.length / LIVROS_POR_PAGINA));
-  const livrosPaginadosGestao = livros.slice(
-    (paginaGestao - 1) * LIVROS_POR_PAGINA,
-    paginaGestao * LIVROS_POR_PAGINA,
-  );
-  const totalPaginasAdminLivros = Math.max(1, Math.ceil(livros.length / LIVROS_POR_PAGINA));
-  const livrosPaginadosAdmin = livros.slice(
-    (paginaAdminLivros - 1) * LIVROS_POR_PAGINA,
-    paginaAdminLivros * LIVROS_POR_PAGINA,
-  );
-  const totalPaginasAdminUsuarios = Math.max(1, Math.ceil(usuariosAdmin.length / LIVROS_POR_PAGINA));
-  const usuariosPaginadosAdmin = usuariosAdmin.slice(
-    (paginaAdminUsuarios - 1) * LIVROS_POR_PAGINA,
-    paginaAdminUsuarios * LIVROS_POR_PAGINA,
-  );
+  const totalPaginasLivros = useMemo(() => Math.max(1, Math.ceil(livrosFiltrados.length / LIVROS_POR_PAGINA)), [livrosFiltrados.length]);
+  const livrosPaginados = useMemo(() =>
+    livrosFiltrados.slice((paginaLivros - 1) * LIVROS_POR_PAGINA, paginaLivros * LIVROS_POR_PAGINA),
+  [livrosFiltrados, paginaLivros]);
+
+  const totalPaginasHome = useMemo(() => Math.max(1, Math.ceil(livros.length / LIVROS_POR_PAGINA)), [livros.length]);
+  const livrosPaginadosHome = useMemo(() =>
+    livros.slice((paginaHome - 1) * LIVROS_POR_PAGINA, paginaHome * LIVROS_POR_PAGINA),
+  [livros, paginaHome]);
+
+  const totalPaginasHomeProfessor = useMemo(() => Math.max(1, Math.ceil(livros.length / LIVROS_POR_PAGINA)), [livros.length]);
+  const livrosPaginadosHomeProfessor = useMemo(() =>
+    livros.slice((paginaHomeProfessor - 1) * LIVROS_POR_PAGINA, paginaHomeProfessor * LIVROS_POR_PAGINA),
+  [livros, paginaHomeProfessor]);
+
+  const totalPaginasGestao = useMemo(() => Math.max(1, Math.ceil(livros.length / LIVROS_POR_PAGINA)), [livros.length]);
+  const livrosPaginadosGestao = useMemo(() =>
+    livros.slice((paginaGestao - 1) * LIVROS_POR_PAGINA, paginaGestao * LIVROS_POR_PAGINA),
+  [livros, paginaGestao]);
+
+  const totalPaginasAdminLivros = useMemo(() => Math.max(1, Math.ceil(livros.length / LIVROS_POR_PAGINA)), [livros.length]);
+  const livrosPaginadosAdmin = useMemo(() =>
+    livros.slice((paginaAdminLivros - 1) * LIVROS_POR_PAGINA, paginaAdminLivros * LIVROS_POR_PAGINA),
+  [livros, paginaAdminLivros]);
+
+  const totalPaginasAdminUsuarios = useMemo(() => Math.max(1, Math.ceil(usuariosAdmin.length / LIVROS_POR_PAGINA)), [usuariosAdmin.length]);
+  const usuariosPaginadosAdmin = useMemo(() =>
+    usuariosAdmin.slice((paginaAdminUsuarios - 1) * LIVROS_POR_PAGINA, paginaAdminUsuarios * LIVROS_POR_PAGINA),
+  [usuariosAdmin, paginaAdminUsuarios]);
 
   function handleBuscaChange(text: string) {
     setBuscaInput(text);
@@ -459,8 +474,6 @@ export default function App() {
       setPaginaLivros(1);
     }, 500);
   }
-
-  const generosUnicos = ['todos', ...Array.from(new Set(livros.map(l => l.genero).filter(Boolean))) as string[]];
 
   function aplicarDadosCarregados(dados: { livros: Livro[]; emprestimos: Emprestimo[]; avaliacoes: Avaliacao[]; desejos: Desejo[]; usuarios: Usuario[]; comunicados: Comunicado[]; suspensoes: Suspensao[] }, usuarioAtual: Usuario | null) {
     const uid = usuarioAtual?.id;
@@ -1154,6 +1167,11 @@ export default function App() {
               <Text style={{ fontSize: 16 }}>{mostrarSenha ? '🙈' : '👁️'}</Text>
             </TouchableOpacity>
           </View>
+          {servidorPronto === false && (
+            <Text style={{ fontSize: 11, color: CORES.muted, textAlign: 'center', marginBottom: 4 }}>
+              Conectando ao servidor...
+            </Text>
+          )}
           <TouchableOpacity style={[s.btnPrimary, loading && { opacity: 0.7 }]}
             onPress={handleLogin} disabled={loading}>
             {loading ? <ActivityIndicator color={CORES.ink} /> : <Text style={s.btnPrimaryText}>Entrar</Text>}
