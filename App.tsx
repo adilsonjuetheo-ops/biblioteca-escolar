@@ -2516,35 +2516,37 @@ export default function App() {
                               </View>
                             )}
                           </View>
-                          {emp.status === 'retirado' && !emp.renovado && (
-                            <TouchableOpacity
-                              style={[s.btnAmber, { backgroundColor: CORES.sage, paddingHorizontal: 8, marginBottom: 4 }]}
-                              onPress={() => handleRenovar(emp)}>
-                              <Text style={s.btnAmberText}>🔄 Renovar</Text>
+                          <View style={{ flexDirection: 'column', gap: 4, flexShrink: 0 }}>
+                            {emp.status === 'retirado' && !emp.renovado && (
+                              <TouchableOpacity
+                                style={[s.btnAmber, { backgroundColor: CORES.sage, paddingHorizontal: 8 }]}
+                                onPress={() => handleRenovar(emp)}>
+                                <Text style={s.btnAmberText}>🔄 Renovar</Text>
+                              </TouchableOpacity>
+                            )}
+                            <TouchableOpacity style={s.btnAmber} onPress={() => handleDevolucao(emp)}>
+                              <Text style={s.btnAmberText}>Devolver</Text>
                             </TouchableOpacity>
-                          )}
-                          <TouchableOpacity style={s.btnAmber} onPress={() => handleDevolucao(emp)}>
-                            <Text style={s.btnAmberText}>Devolver</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={[s.btnAmber, { backgroundColor: CORES.rust, paddingHorizontal: 8, marginTop: 4 }]}
-                            onPress={() => {
-                              Alert.prompt(
-                                'Bloquear aluno',
-                                'Quantos dias de bloqueio?',
-                                (dias) => {
-                                  if (!dias || isNaN(Number(dias))) return;
-                                  Alert.prompt('Motivo', 'Informe o motivo (opcional)', (motivo) => {
-                                    handleAplicarSuspensao(emp, Number(dias), motivo || 'Devolução em atraso');
-                                  });
-                                },
-                                'plain-text',
-                                '',
-                                'number-pad'
-                              );
-                            }}>
-                            <Text style={s.btnAmberText}>🚫 Bloquear</Text>
-                          </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[s.btnAmber, { backgroundColor: CORES.rust, paddingHorizontal: 8 }]}
+                              onPress={() => {
+                                Alert.prompt(
+                                  'Bloquear aluno',
+                                  'Quantos dias de bloqueio?',
+                                  (dias) => {
+                                    if (!dias || isNaN(Number(dias))) return;
+                                    Alert.prompt('Motivo', 'Informe o motivo (opcional)', (motivo) => {
+                                      handleAplicarSuspensao(emp, Number(dias), motivo || 'Devolução em atraso');
+                                    });
+                                  },
+                                  'plain-text',
+                                  '',
+                                  'number-pad'
+                                );
+                              }}>
+                              <Text style={s.btnAmberText}>🚫 Bloquear</Text>
+                            </TouchableOpacity>
+                          </View>
                         </View>
                       );
                     })}
