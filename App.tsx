@@ -2489,8 +2489,9 @@ export default function App() {
                       </View>
                     ) : empFiltrados.map(emp => {
                       const capaUrl = emp.capa || livros.find(l => l.id === emp.livroId)?.capa || '';
-                      const diasVencer = emp.dataPrevistaDevolucao
-                        ? Math.ceil((new Date(emp.dataPrevistaDevolucao).getTime() - Date.now()) / 86400000)
+                      const dataVenc = emp.status !== 'devolvido' ? (emp.dataDevolucao || emp.dataPrevistaDevolucao) : undefined;
+                      const diasVencer = dataVenc
+                        ? Math.ceil((new Date(dataVenc).getTime() - Date.now()) / 86400000)
                         : null;
                       const alertaVencendo = diasVencer !== null && diasVencer <= 2;
                       return (
