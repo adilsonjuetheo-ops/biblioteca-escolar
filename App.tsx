@@ -2459,6 +2459,7 @@ export default function App() {
                         { key: 'todos', label: 'Todos' },
                         { key: 'reservado', label: 'Reservados' },
                         { key: 'retirado', label: 'Retirados' },
+                        { key: 'atrasado', label: 'Atrasados' },
                       ] as const).map(f => (
                         <TouchableOpacity key={f.key}
                           style={[s.filtroBtn, filtroEmpStatus === f.key && s.filtroBtnAtivo]}
