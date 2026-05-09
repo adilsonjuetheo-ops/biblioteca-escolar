@@ -481,7 +481,7 @@ export default function App() {
     const todosEmprestimos: Emprestimo[] = Array.isArray(dados.emprestimos) ? dados.emprestimos : [];
     const perfil = usuarioAtual?.perfil;
     const isBiblio = !!perfil && perfil !== 'aluno' && perfil !== 'professor';
-    const ativos = todosEmprestimos.filter(e => e.status === 'reservado' || e.status === 'retirado');
+    const ativos = todosEmprestimos.filter(e => e.status === 'reservado' || e.status === 'retirado' || e.status === 'atrasado');
     const devolvidos = todosEmprestimos.filter(e => e.status === 'devolvido');
     const isProf = perfil === 'professor';
     setEmprestimosAtivos(isBiblio ? ativos : ativos.filter(e => e.usuarioId === uid));
