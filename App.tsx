@@ -262,6 +262,14 @@ export default function App() {
   const [historico, setHistorico] = useState<Emprestimo[]>([]);
   const [carregando, setCarregando] = useState(false);
   const [livroSelecionado, setLivroSelecionado] = useState<Livro | null>(null);
+  const [sinopseLivro, setSinopseLivro] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (!livroSelecionado) { setSinopseLivro(undefined); return; }
+    http.get<{ sinopse?: string }>(`/livros/${livroSelecionado.id}`)
+      .then(r => setSinopseLivro(r.data.sinopse ?? undefined))
+      .catch(() => setSinopseLivro(undefined));
+  }, [livroSelecionado?.id]);
   const [buscaInput, setBuscaInput] = useState('');
   const [buscaTexto, setBuscaTexto] = useState('');
   const [filtroGenero, setFiltroGenero] = useState('todos');
