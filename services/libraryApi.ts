@@ -100,7 +100,7 @@ export async function carregarDadosBiblioteca(usuarioAtual?: Usuario | null): Pr
 
   if (dashboardEndpointAvailable) {
     try {
-      const { data } = await http.get<DashboardData>(`/dashboard${query}`);
+      const { data } = await http.get<DashboardData>(`/dashboard${query}`, { timeout: 30000 });
       const result: DashboardData = {
         livros: Array.isArray(data.livros) ? data.livros : [],
         emprestimos: Array.isArray(data.emprestimos) ? data.emprestimos : [],
