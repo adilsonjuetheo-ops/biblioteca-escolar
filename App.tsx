@@ -2507,8 +2507,8 @@ export default function App() {
                             {emp.usuarioTurma ? (
                               <Text style={[s.loanAuthor, { color: CORES.amber }]}>Turma {emp.usuarioTurma}</Text>
                             ) : null}
-                            <View style={[s.badgeSmall, { backgroundColor: 'rgba(201,123,46,0.12)', marginTop: 6 }]}>
-                              <Text style={[s.badgeText, { color: CORES.amber }]}>{emp.status}</Text>
+                            <View style={[s.badgeSmall, { backgroundColor: emp.status === 'atrasado' ? 'rgba(184,76,46,0.15)' : 'rgba(201,123,46,0.12)', marginTop: 6 }]}>
+                              <Text style={[s.badgeText, { color: emp.status === 'atrasado' ? CORES.rust : CORES.amber }]}>{emp.status}</Text>
                             </View>
                             {alertaVencendo && (
                               <View style={[s.badgeSmall, { backgroundColor: diasVencer! < 0 ? 'rgba(184,76,46,0.15)' : 'rgba(201,123,46,0.15)', marginTop: 4 }]}>
