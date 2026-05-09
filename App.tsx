@@ -2489,7 +2489,7 @@ export default function App() {
                       </View>
                     ) : empFiltrados.map(emp => {
                       const capaUrl = emp.capa || livros.find(l => l.id === emp.livroId)?.capa || '';
-                      const dataVenc = emp.status !== 'devolvido' ? (emp.dataDevolucao || emp.dataPrevistaDevolucao) : undefined;
+                      const dataVenc = emp.dataDevolucao || emp.dataPrevistaDevolucao;
                       const diasVencer = dataVenc
                         ? Math.ceil((new Date(dataVenc).getTime() - Date.now()) / 86400000)
                         : null;
