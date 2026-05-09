@@ -1458,10 +1458,10 @@ export default function App() {
             ))}
           </View>
 
-          {livroSelecionado?.sinopse ? (
+          {sinopseLivro ? (
             <View style={{ marginTop: 20 }}>
               <Text style={s.sectionLabel}>SINOPSE</Text>
-              <Text style={s.detalheSinopse}>{livroSelecionado.sinopse}</Text>
+              <Text style={s.detalheSinopse}>{sinopseLivro}</Text>
             </View>
           ) : null}
 
