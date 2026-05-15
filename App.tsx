@@ -907,6 +907,7 @@ export default function App() {
             try {
               await renovarEmprestimo(emp.id);
               Alert.alert('Renovado!', 'Prazo estendido por mais 5 dias.');
+              clearDashboardCache();
               await carregarDados();
             } catch (err: unknown) {
               Alert.alert('Erro', getApiErrorMessage(err, 'Não foi possível renovar.'));
