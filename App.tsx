@@ -799,6 +799,7 @@ export default function App() {
     try {
       await devolverEmprestimo(emp.id);
       Alert.alert('Devolução registrada!', 'Livro devolvido com sucesso.');
+      clearDashboardCache();
       await carregarDados();
     } catch {
       Alert.alert('Erro', 'Não foi possível registrar devolução.');
